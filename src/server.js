@@ -114,7 +114,7 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
     delivered_at: metadata?.delivered_at
   };
 
-  const result = await retell.calls.createPhoneCall({
+  const result = await retell.call.createPhoneCall({
     // Required
     to_number: phone,
     from_number_id: fromNumberId || process.env.RETELL_NUMBER_ID,
