@@ -370,7 +370,7 @@ app.get("/shopify/order-by-number", async (req, res) => {
 // Batch call with optional overrides
 app.post("/call/batch", async (req, res) => {
   try {
-    const { hours = 48, agentId, fromNumber } = req.body || {};
+    const { hours = 48, agentId, fromNumber, max_followup_questions, resolution_preference } = req.body || {};
     if (!inCallWindow()) return res.status(403).json({ error: "Outside calling window" });
     const candidates = await fetchRecentDeliveredOrders({ hours });
     const dnc = new Set(readJson(dncPath, { phones: [] }).phones);
@@ -388,7 +388,13 @@ app.post("/call/batch", async (req, res) => {
           orderNumber: c.order_number,
           agentId,
           fromNumber,
-          metadata: { primary_item: c.primary_item, items_summary: c.items_summary, delivered_at: c.delivered_at }
+          metadata: {
+            primary_item: c.primary_item,
+            items_summary: c.items_summary,
+            delivered_at: c.delivered_at,
+            max_followup_questions,
+            resolution_preference
+          }
         });
         results.push({ ok: true, call_id: r.call_id, to: c.phone, order_number: c.order_number });
       } catch (err) {
