@@ -114,6 +114,11 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
     delivered_at: metadata?.delivered_at
   };
 
+  // Remove undefined values so we only pass concrete variables
+  const dynamicVars = Object.fromEntries(
+    Object.entries(vars).filter(([, v]) => v !== undefined && v !== null)
+  );
+
   const result = await retell.call.createPhoneCall({
     // Required
     to_number: phone,
@@ -121,6 +126,8 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
     override_agent_id: agentId || process.env.RETELL_AGENT_ID,
     // Optional runtime variables
     metadata: { source: "meatery-post-delivery", ...vars, ...(metadata || {}) },
+    // Inject variables for prompt interpolation in Retell LLM / conversation flow
+    retell_llm_dynamic_variables: dynamicVars,
     // Call config overrides for this call only
     amd: { enable: true }, // answering machine detection
   });
@@ -373,7 +380,14 @@ app.post("/call/batch", async (req, res) => {
         continue;
       }
       try {
-        const r = await placeConfirmationCall({ phone: c.phone, customerName: c.name, orderNumber: c.order_number, agentId, fromNumber });
+        const r = await placeConfirmationCall({
+          phone: c.phone,
+          customerName: c.name,
+          orderNumber: c.order_number,
+          agentId,
+          fromNumber,
+          metadata: { primary_item: c.primary_item, items_summary: c.items_summary, delivered_at: c.delivered_at }
+        });
         results.push({ ok: true, call_id: r.call_id, to: c.phone, order_number: c.order_number });
       } catch (err) {
         results.push({ ok: false, to: c.phone, error: err?.response?.data || err.message });
