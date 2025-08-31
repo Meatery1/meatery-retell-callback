@@ -7,12 +7,23 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { 
+  createAndSendDiscount, 
+  checkDiscountEligibility 
+} from './discount-sms-service.js';
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json({ limit: "2mb" }));
+// Use JSON parser for all routes except the webhook
+app.use((req, res, next) => {
+  if (req.path === '/webhooks/retell') {
+    next();
+  } else {
+    bodyParser.json({ limit: "2mb" })(req, res, next);
+  }
+});
 app.use(express.static("public"));
 
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
@@ -188,6 +199,17 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
 // --- Routes ---
 app.get("/health", (req, res) => res.json({ ok: true }));
 
+// --- Prompt Improvement Loop ---
+app.post("/improve-prompt", async (req, res) => {
+  try {
+    const { runImprovementLoop } = await import('./prompt-improvement-loop.js');
+    const result = await runImprovementLoop();
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ---- Retell Agent management ----
 app.get("/agents", async (_req, res) => {
   try {
@@ -272,8 +294,19 @@ app.post("/tasks/call-recent", async (req, res) => {
 // Retell webhook receiver (call_started / call_ended / call_analyzed)
 app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, res) => {
   try {
-    // Optional: verify signature using RETELL_WEBHOOK_SECRET if provided by SDK in future; for now just parse
-    const event = JSON.parse(req.body.toString());
+    // Parse the raw body
+    let event;
+    if (Buffer.isBuffer(req.body)) {
+      event = JSON.parse(req.body.toString());
+    } else if (typeof req.body === 'string') {
+      event = JSON.parse(req.body);
+    } else if (typeof req.body === 'object') {
+      // Body is already parsed (shouldn't happen with our middleware fix, but just in case)
+      event = req.body;
+    } else {
+      throw new Error('Invalid request body type');
+    }
+    
     console.log("Retell Webhook:", event.type, event?.data?.call_id);
     try { appendJsonl(callsLogPath, { received_at: new Date().toISOString(), ...event }); } catch (_) {}
     // Best-effort Shopify side-effects
@@ -283,7 +316,52 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
         const m = event?.data?.metadata || {};
         const analysis = event?.data?.analysis || {};
         const structured = analysis?.structured || {};
+        const transcript = event?.data?.transcript || "";
         const orderNumber = m.order_number || structured.order_number;
+        
+        // Check if discount should be sent
+        if (type === "call_analyzed" || type === "call_ended") {
+          const shouldSendDiscount = 
+            transcript.includes("sending that discount code") ||
+            transcript.includes("text you a") ||
+            transcript.includes("10% off") ||
+            (structured.send_discount_sms === true);
+          
+          if (shouldSendDiscount) {
+            const customerPhone = m.customer_phone || structured.customer_phone || event?.data?.phone;
+            const customerName = m.customer_name || structured.customer_name || "Valued Customer";
+            const customerEmail = m.customer_email || structured.customer_email;
+            
+            if (customerPhone) {
+              console.log(`📱 Sending discount SMS to ${customerPhone}...`);
+              
+              try {
+                // Cap discount at 15% maximum
+                let discountValue = structured.discount_value || 10;
+                if (discountValue > 15) {
+                  console.log(`⚠️ Capping webhook discount at 15% (was ${discountValue}%)`);
+                  discountValue = 15;
+                }
+                
+                const discountResult = await createAndSendDiscount({
+                  customerPhone,
+                  customerName,
+                  customerEmail,
+                  discountType: 'percentage',
+                  discountValue: discountValue,
+                  reason: structured.discount_reason || 'customer_service',
+                  orderNumber
+                });
+                
+                if (discountResult.success) {
+                  console.log(`✅ Discount sent: ${discountResult.discount.code}`);
+                }
+              } catch (err) {
+                console.error(`❌ Failed to send discount:`, err.message);
+              }
+            }
+          }
+        }
         if (!orderNumber) return;
         const order = await shopifyGetOrderByNumber(orderNumber);
         if (!order?.id) return;
@@ -310,7 +388,11 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
     })();
     res.status(200).send("ok");
   } catch (e) {
-    console.error("Webhook parse error", e);
+    console.error("Webhook parse error:", e.message);
+    console.error("Request body type:", typeof req.body);
+    if (req.body) {
+      console.error("Body sample:", Buffer.isBuffer(req.body) ? req.body.toString().substring(0, 100) : JSON.stringify(req.body).substring(0, 100));
+    }
     res.status(400).send("bad-request");
   }
 });
@@ -480,6 +562,105 @@ app.post("/call/batch", async (req, res) => {
     res.json({ count: results.length, results });
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// --- Discount and SMS endpoints for Retell custom tools ---
+app.post("/tools/send-discount", async (req, res) => {
+  try {
+    const { 
+      customer_phone,
+      customer_name,
+      customer_email,
+      order_number,
+      discount_type = 'percentage',
+      discount_value = 10,
+      reason = 'customer_service'
+    } = req.body;
+
+    if (!customer_phone) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Customer phone number is required" 
+      });
+    }
+
+    // Check eligibility first
+    const eligibility = await checkDiscountEligibility({
+      customerEmail: customer_email,
+      customerPhone: customer_phone,
+      orderNumber: order_number
+    });
+
+    if (!eligibility.eligible) {
+      return res.json({
+        success: false,
+        reason: eligibility.reason,
+        message: "Customer not eligible for discount at this time",
+        speak: "I checked and you've already used a discount recently. I'll note your request and have our team look into other options for you."
+      });
+    }
+
+    // Use suggested discount value if higher, but cap at 15%
+    let finalDiscountValue = eligibility.discount_value || discount_value;
+    if (finalDiscountValue > 15) {
+      console.log(`⚠️ Capping discount at 15% (was ${finalDiscountValue}%)`);
+      finalDiscountValue = 15;
+    }
+
+    // Create and send the discount
+    const result = await createAndSendDiscount({
+      customerPhone: customer_phone,
+      customerName: customer_name || 'Valued Customer',
+      customerEmail: customer_email,
+      discountType: discount_type,
+      discountValue: finalDiscountValue,
+      reason: reason,
+      orderNumber: order_number
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        discount_code: result.discount.code,
+        message: result.summary,
+        speak: `Perfect! I've just texted you a ${finalDiscountValue}% off discount code to use on your next order. You should receive it within a few seconds. The code is ${result.discount.code.split('').join(' ')} and it's good for 30 days.`
+      });
+    } else {
+      res.json({
+        success: false,
+        error: result.error,
+        speak: "I'm having trouble creating that discount code right now. Let me have someone from our team follow up with you directly."
+      });
+    }
+
+  } catch (error) {
+    console.error('Error in /tools/send-discount:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      speak: "I apologize, but I'm unable to process that discount right now. I'll make sure someone from our team reaches out to you."
+    });
+  }
+});
+
+app.post("/tools/check-discount-eligibility", async (req, res) => {
+  try {
+    const { customer_phone, customer_email, order_number } = req.body;
+    
+    const eligibility = await checkDiscountEligibility({
+      customerEmail: customer_email,
+      customerPhone: customer_phone,
+      orderNumber: order_number
+    });
+
+    res.json(eligibility);
+  } catch (error) {
+    res.status(500).json({ 
+      eligible: true, // Default to eligible if check fails
+      reason: 'default',
+      error: error.message 
+    });
   }
 });
 

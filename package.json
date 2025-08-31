@@ -5,14 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "improve": "node src/prompt-improvement-loop.js",
+    "approve": "node src/approve-improvements.js",
+    "scheduler": "node src/improvement-scheduler.js",
+    "test-discount": "node test-discount-sms.js"
   },
   "dependencies": {
+    "@abhaybabbar/retellai-mcp-server": "^1.0.2",
     "axios": "^1.7.2",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
+    "cron": "^3.1.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "retell-sdk": "^3.0.0"
+    "openai": "^4.56.0",
+    "retell-sdk": "^3.0.0",
+    "twilio": "^5.0.0"
   }
 }
