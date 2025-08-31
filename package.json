@@ -9,7 +9,20 @@
     "improve": "node src/prompt-improvement-loop.js",
     "approve": "node src/approve-improvements.js",
     "scheduler": "node src/improvement-scheduler.js",
-    "test-discount": "node test-discount-sms.js"
+    "test-discount": "node test-discount-sms.js",
+    "test": "node -r dotenv/config agent-test-simulator.js",
+    "test:quick": "node -r dotenv/config agent-test-simulator.js --quick",
+    "test:category": "node -r dotenv/config agent-test-simulator.js --category",
+    "test:advanced": "node -r dotenv/config advanced-retell-tester.js",
+    "test:stress": "node -r dotenv/config advanced-retell-tester.js --concurrent 10",
+    "test:web": "node -r dotenv/config retell-web-call-tester.js",
+    "monitor": "node -r dotenv/config retell-performance-monitor.js",
+    "monitor:once": "node -r dotenv/config retell-performance-monitor.js --once",
+    "monitor:dashboard": "node -r dotenv/config retell-performance-monitor.js --dashboard",
+    "analyze-call": "node -r dotenv/config analyze-single-call.js",
+    "apply-improvements": "node -r dotenv/config apply-test-improvements.js",
+    "apply-improvements:auto": "node -r dotenv/config apply-test-improvements.js --auto",
+    "update-thawed-policy": "node -r dotenv/config update-agent-thawed-policy.js"
   },
   "dependencies": {
     "@abhaybabbar/retellai-mcp-server": "^1.0.2",

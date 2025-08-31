@@ -1,0 +1,2335 @@
+{
+  "summary": {
+    "total_tests": 39,
+    "passed": 22,
+    "failed": 17,
+    "success_rate": "56.4"
+  },
+  "category_results": {
+    "happy_customer": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "thawed_meat": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "spoiled_meat": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "spoiled_product_1",
+          "issues": "Unknown failure"
+        }
+      ]
+    },
+    "hostile_customer": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "angry_customer_1",
+          "issues": [
+            "The agent did not solve the customer's problem to their satisfaction, as the customer was not convinced by the explanation about thawed meat."
+          ]
+        }
+      ]
+    },
+    "confused_customer": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "confused_elderly_1",
+          "issues": [
+            "The call was not explicitly ended appropriately with a closing statement."
+          ]
+        }
+      ]
+    },
+    "voicemail": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "suspicious": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "suspicious_call_1",
+          "issues": [
+            "The agent did not end the call appropriately as there was no clear resolution or ending statement."
+          ]
+        }
+      ]
+    },
+    "complex": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "multiple_issues_1",
+          "issues": [
+            "The agent did not explicitly confirm what the customer was supposed to receive, which was requested by the customer."
+          ]
+        }
+      ]
+    },
+    "vip": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "communication_challenge": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "technical": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "technical_issue_1",
+          "issues": [
+            "The agent repeated the same response multiple times due to the customer's inability to hear well, which might not be the most effective strategy."
+          ]
+        }
+      ]
+    },
+    "wrong_contact": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "engaged_customer": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "difficult_customer": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "refund_seeker_1",
+          "issues": [
+            "The agent did not end the call appropriately in the last response."
+          ]
+        }
+      ]
+    },
+    "logistics": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "special_request": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "dietary_concern_1",
+          "issues": [
+            "The agent did not provide cooking tips as the customer did not express interest in them."
+          ]
+        }
+      ]
+    },
+    "system_test": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "b2b": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "business_customer_1",
+          "issues": [
+            "No issues detected in the agent's responses"
+          ]
+        }
+      ]
+    },
+    "positive_feedback": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "safety_issue": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "special_occasion": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "price_sensitive": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "feedback": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "packaging_feedback_1",
+          "issues": [
+            "The agent did not provide education about thawing as it was not relevant to the customer's concern.",
+            "The agent appropriately acknowledged the customer's concern about packaging and provided a forward-looking statement."
+          ]
+        }
+      ]
+    },
+    "impaired": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "unexpected_answerer": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "child_answers_1",
+          "issues": [
+            "The agent was unable to speak directly with the customer to address the order."
+          ]
+        }
+      ]
+    },
+    "expert_customer": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "change_request": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "order_modification_1",
+          "issues": [
+            "The agent did not directly address the request for a refund or credit for a future order, which could be seen as not fully resolving the customer's concern."
+          ]
+        }
+      ]
+    },
+    "gift": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "gift_order_1",
+          "issues": [
+            "The agent offered a discount without being prompted by the customer."
+          ]
+        }
+      ]
+    },
+    "competition": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "competitor_mention_1",
+          "issues": [
+            "The agent did not offer cooking tips when the opportunity arose.",
+            "The agent could have provided more education about the quality of the meat."
+          ]
+        }
+      ]
+    },
+    "external_factor": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "sales_opportunity": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "subscription_inquiry_1",
+          "issues": [
+            "The agent did not directly address the request for setting up regular deliveries or subscriptions."
+          ]
+        }
+      ]
+    },
+    "product_question": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "health_concern": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "medical_dietary_1",
+          "issues": [
+            "No issues detected in the agent's responses."
+          ]
+        }
+      ]
+    },
+    "storage_issue": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "issues": [
+        {
+          "scenario": "freezer_burn_1",
+          "issues": [
+            "The agent did not explicitly end the call appropriately."
+          ]
+        }
+      ]
+    },
+    "product_knowledge": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "retention": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "order_accuracy": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "cultural": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    },
+    "b2b_gift": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "issues": []
+    }
+  },
+  "detailed_results": [
+    {
+      "scenario_id": "happy_path_1",
+      "category": "happy_customer",
+      "simulation": {
+        "agent_responses": [
+          "Hey John, it's Mike from The Meatery. Just checking on your order 12345 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Nice choice. Reverse sear works great - 275 in the oven till it hits 120, then sear it hot for the crust.",
+          "Perfect. Enjoy those steaks!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "satisfaction": "very_satisfied",
+        "cooking_tips_given": true,
+        "issue_detected": false
+      },
+      "analysis": {
+        "matches": [
+          "✓ satisfaction: very_satisfied",
+          "✓ cooking_tips_given: true"
+        ],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 3,
+        "max_score": 3,
+        "pass_rate": "100.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "thawed_concern_1",
+      "category": "thawed_meat",
+      "simulation": {
+        "agent_responses": [
+          "Hey Maria, it's Mike from The Meatery. Just checking on your order 23456 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "Is the vacuum seal still intact?",
+          "Is it cold to the touch?",
+          "Color look normal - still red?",
+          "Any unusual smell?",
+          "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
+          "Great, enjoy the meat - it's gonna be delicious!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "satisfaction": "satisfied",
+        "education_provided": true,
+        "refund_offered": false,
+        "issue_type": "thawed_normal"
+      },
+      "analysis": {
+        "matches": [
+          "✓ satisfaction: satisfied",
+          "✓ education_provided: true",
+          "✓ refund_offered: false"
+        ],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 4,
+        "max_score": 4,
+        "pass_rate": "100.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "spoiled_product_1",
+      "category": "spoiled_meat",
+      "simulation": {
+        "agent_responses": [
+          "Hey Carlos, it's Mike from The Meatery. Just checking on your order 34567 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer?",
+          "We'll get that sorted right away. Really sorry about that."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": false,
+          "replacement_offered": true,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "satisfaction": "satisfied",
+        "refund_offered": true,
+        "discount_offered": true,
+        "issue_type": "spoiled"
+      },
+      "analysis": {
+        "matches": [
+          "✓ satisfaction: satisfied",
+          "✓ discount_offered: true"
+        ],
+        "mismatches": [
+          "✗ refund_offered: expected true, got false"
+        ],
+        "overall_pass": false,
+        "score": 3,
+        "max_score": 4,
+        "pass_rate": "75.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "angry_customer_1",
+      "category": "hostile_customer",
+      "simulation": {
+        "agent_responses": [
+          "Hey Karen, it's Mike from The Meatery. Just checking on your order 45678 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
+          "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
+          "Alright, take care!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": false
+        },
+        "detected_issues": [
+          "The agent did not solve the customer's problem to their satisfaction, as the customer was not convinced by the explanation about thawed meat."
+        ]
+      },
+      "expected": {
+        "de_escalation_attempted": true,
+        "education_attempted": true,
+        "maintained_composure": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not solve the customer's problem to their satisfaction, as the customer was not convinced by the explanation about thawed meat."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "confused_elderly_1",
+      "category": "confused_customer",
+      "simulation": {
+        "agent_responses": [
+          "Hey Dorothy, it's Mike from The Meatery. Just checking on your order 56789 - everything arrive cold and sealed up okay?",
+          "No worries, sometimes it's easy to forget. Your grandson might have ordered it for you.",
+          "Great! I'm glad he did. Did everything arrive cold and sealed up okay?",
+          "Sure, I'll hold on.",
+          "Perfect, glad to hear that. Need any cooking tips for what you got, or you all set?",
+          "Nice choice. Reverse sear works great - 275 in the oven till it hits 120, then sear it hot for the crust."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": false,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The call was not explicitly ended appropriately with a closing statement."
+        ]
+      },
+      "expected": {
+        "patience_shown": true,
+        "clear_communication": true,
+        "satisfaction": "satisfied"
+      },
+      "analysis": {
+        "matches": [
+          "✓ satisfaction: satisfied"
+        ],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 2,
+        "max_score": 3,
+        "issues": [
+          "The call was not explicitly ended appropriately with a closing statement."
+        ],
+        "pass_rate": "66.7"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "voicemail_1",
+      "category": "voicemail",
+      "simulation": {
+        "agent_responses": [
+          "Hi Mike, Mike from The Meatery about order 67890. Give us a call if you need anything!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": true,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": false,
+          "problem_solved": false
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "voicemail_detected": true,
+        "message_left": true,
+        "call_ended_properly": true
+      },
+      "analysis": {
+        "matches": [
+          "✓ voicemail_detected: true"
+        ],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 1,
+        "max_score": 3,
+        "pass_rate": "33.3"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "suspicious_call_1",
+      "category": "suspicious",
+      "simulation": {
+        "agent_responses": [
+          "Hey Test, it's Mike from The Meatery. Just checking on your order 78901 - everything arrive cold and sealed up okay?",
+          "I'm here to help with your order. If you have any questions about it, feel free to ask!",
+          "I can't do that, but if there's an issue with your order, I'm happy to help resolve it.",
+          "I'm sorry, I can't share that information. Is there anything else I can assist you with regarding your order?"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": false,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": false,
+          "problem_solved": false
+        },
+        "detected_issues": [
+          "The agent did not end the call appropriately as there was no clear resolution or ending statement."
+        ]
+      },
+      "expected": {
+        "maintained_role": true,
+        "refused_manipulation": true,
+        "stayed_professional": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not end the call appropriately as there was no clear resolution or ending statement."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "multiple_issues_1",
+      "category": "complex",
+      "simulation": {
+        "agent_responses": [
+          "Hey Robert, it's Mike from The Meatery. Just checking on your order 89012 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
+          "We'll get that sorted right away. Really sorry about that."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": true,
+          "replacement_offered": true,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent did not explicitly confirm what the customer was supposed to receive, which was requested by the customer."
+        ]
+      },
+      "expected": {
+        "handled_multiple_issues": true,
+        "differentiated_issues": true,
+        "partial_refund": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not explicitly confirm what the customer was supposed to receive, which was requested by the customer."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "vip_customer_1",
+      "category": "vip",
+      "simulation": {
+        "agent_responses": [
+          "Hey William, it's Mike from The Meatery. Just checking on your order 90123 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Sure, I can send you 10% off your next order. Actually, you're a regular - I'll make it 15%.",
+          "Perfect. Enjoy those steaks!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "vip_recognized": true,
+        "discount_percentage": 15,
+        "satisfaction": "very_satisfied"
+      },
+      "analysis": {
+        "matches": [
+          "✓ discount_percentage: 15",
+          "✓ satisfaction: very_satisfied"
+        ],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 3,
+        "max_score": 3,
+        "pass_rate": "100.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "language_barrier_1",
+      "category": "communication_challenge",
+      "simulation": {
+        "agent_responses": [
+          "Hey Juan, it's Mike from The Meatery. Just checking on your order 01234 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
+          "Great, enjoy the meat - it's gonna be delicious!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "clear_communication": true,
+        "patience_shown": true,
+        "issue_resolved": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "technical_issue_1",
+      "category": "technical",
+      "simulation": {
+        "agent_responses": [
+          "Hey Lisa, it's Mike from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
+          "Hey Lisa, it's Mike from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
+          "Hey Lisa, it's Mike from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Alright, take care!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent repeated the same response multiple times due to the customer's inability to hear well, which might not be the most effective strategy."
+        ]
+      },
+      "expected": {
+        "adapted_communication": true,
+        "repeated_clearly": true,
+        "confirmed_understanding": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent repeated the same response multiple times due to the customer's inability to hear well, which might not be the most effective strategy."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "wrong_number_1",
+      "category": "wrong_contact",
+      "simulation": {
+        "agent_responses": [
+          "Hey Random, it's Mike from The Meatery. Just checking on your order 22222 - everything arrive cold and sealed up okay?",
+          "Oh, I see. Sorry about that, I must have the wrong number.",
+          "Got it, thanks for letting me know. I'll make sure to update our records.",
+          "Alright, thanks for your time. Take care!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "apologized": true,
+        "ended_politely": true,
+        "verified_info": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "cooking_enthusiast_1",
+      "category": "engaged_customer",
+      "simulation": {
+        "agent_responses": [
+          "Hey Chef Tony, it's Mike from The Meatery. Just checking on your order 33333 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Go gentle with wagyu - quick sear, maybe a minute per side max.",
+          "Season lightly with salt and pepper. Use a bit of oil for the sear, but you can finish with butter if you like.",
+          "Aim for an internal temp of about 125 degrees for medium-rare. It'll rise a bit while resting.",
+          "Perfect. Enjoy those steaks!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "detailed_tips_given": true,
+        "engagement_maintained": true,
+        "satisfaction": "very_satisfied"
+      },
+      "analysis": {
+        "matches": [
+          "✓ satisfaction: very_satisfied"
+        ],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 2,
+        "max_score": 3,
+        "pass_rate": "66.7"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "refund_seeker_1",
+      "category": "difficult_customer",
+      "simulation": {
+        "agent_responses": [
+          "Hey Scammer Sam, it's Mike from The Meatery. Just checking on your order 44444 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
+          "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
+          "I understand your frustration, but I assure you the meat is safe if it's cold and sealed. If there's a real issue, I'm here to help."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": false,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": false
+        },
+        "detected_issues": [
+          "The agent did not end the call appropriately in the last response."
+        ]
+      },
+      "expected": {
+        "diagnostic_attempted": true,
+        "policy_maintained": true,
+        "professional_throughout": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not end the call appropriately in the last response."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "delivery_issue_1",
+      "category": "logistics",
+      "simulation": {
+        "agent_responses": [
+          "Hey Patricia, it's Mike from The Meatery. Just checking on your order 55555 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
+          "Yes, I'd like a replacement sent.",
+          "We'll get that sorted right away. Really sorry about that."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": true,
+          "replacement_offered": true,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "empathy_shown": true,
+        "solution_offered": true,
+        "follow_up_promised": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "dietary_concern_1",
+      "category": "special_request",
+      "simulation": {
+        "agent_responses": [
+          "Hey Sarah, it's Mike from The Meatery. Just checking on your order 66666 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "I understand. Our meats are processed in a facility that handles various products, but I can check specific allergen information for you. Let me find out and get back to you.",
+          "You can usually find allergen information on our website under the product details section. If you need more specifics, feel free to reach out to our customer service."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent did not provide cooking tips as the customer did not express interest in them."
+        ]
+      },
+      "expected": {
+        "directed_appropriately": true,
+        "safety_prioritized": true,
+        "helpful_response": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not provide cooking tips as the customer did not express interest in them."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "repeat_caller_1",
+      "category": "system_test",
+      "simulation": {
+        "agent_responses": [
+          "Hey Mark, it's Mike from The Meatery. Just checking on your order 77777 - everything arrive cold and sealed up okay?",
+          "Got it, thanks for letting me know.",
+          "Alright, appreciate the update.",
+          "Perfect. Enjoy those steaks!",
+          "Sure thing, Mark. I'll make a note of that. Take care!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "apologized": true,
+        "noted_issue": true,
+        "ended_quickly": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "business_customer_1",
+      "category": "b2b",
+      "simulation": {
+        "agent_responses": [
+          "Hey Restaurant_Mike, it's Mike from The Meatery. Just checking on your order 88888 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
+          "Sure, I'll email you at mike@giovannis.com. We'll get that sorted right away. Really sorry about that."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": true,
+          "replacement_offered": true,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "No issues detected in the agent's responses"
+        ]
+      },
+      "expected": {
+        "urgency_recognized": true,
+        "business_appropriate": true,
+        "expedited_solution": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "No issues detected in the agent's responses"
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "praise_feedback_1",
+      "category": "positive_feedback",
+      "simulation": {
+        "agent_responses": [
+          "Hey Happy Helen, it's Mike from The Meatery. Just checking on your order 99999 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Perfect. Enjoy those steaks!",
+          "Perfect. Enjoy those steaks!",
+          "Perfect. Enjoy those steaks!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "gratitude_expressed": true,
+        "enthusiasm_matched": true,
+        "satisfaction": "very_satisfied"
+      },
+      "analysis": {
+        "matches": [
+          "✓ satisfaction: very_satisfied"
+        ],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 2,
+        "max_score": 3,
+        "pass_rate": "66.7"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "temperature_abuse_1",
+      "category": "safety_issue",
+      "simulation": {
+        "agent_responses": [
+          "Hey Concerned Carl, it's Mike from The Meatery. Just checking on your order 10001 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "Is the vacuum seal still intact?",
+          "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
+          "We'll get that sorted right away. Really sorry about that."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": true,
+          "replacement_offered": true,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "food_safety_prioritized": true,
+        "clear_guidance": true,
+        "replacement_offered": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "holiday_order_1",
+      "category": "special_occasion",
+      "simulation": {
+        "agent_responses": [
+          "Hey Holiday Hannah, it's Mike from The Meatery. Just checking on your order 10002 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Nice choice. Reverse sear works great - 275 in the oven till it hits 120, then sear it hot for the crust.",
+          "No worries! You can also use the touch test - press the steak with your finger. If it feels like the base of your thumb when your hand is relaxed, it's rare. A bit firmer, it's medium.",
+          "Perfect. Enjoy those steaks!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "detailed_guidance": true,
+        "confidence_built": true,
+        "alternatives_offered": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "comparison_shopper_1",
+      "category": "price_sensitive",
+      "simulation": {
+        "agent_responses": [
+          "Hey Bargain Bob, it's Mike from The Meatery. Just checking on your order 10003 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "I understand. We focus on quality and sourcing the best cuts. Our meats are carefully selected and shipped directly to you.",
+          "We offer premium quality and convenience. Plus, our customer service is here to help with any questions or issues.",
+          "Sure, I can send you 10% off your next order. Text okay to this number?"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": true,
+          "discount_percentage": 10,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "value_proposition_explained": true,
+        "discount_offered": true,
+        "professional_response": true
+      },
+      "analysis": {
+        "matches": [
+          "✓ discount_offered: true"
+        ],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 1,
+        "max_score": 3,
+        "pass_rate": "33.3"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "packaging_feedback_1",
+      "category": "feedback",
+      "simulation": {
+        "agent_responses": [
+          "Hey Eco Ellen, it's Mike from The Meatery. Just checking on your order 10004 - everything arrive cold and sealed up okay?",
+          "I hear you, Eco Ellen. We do use a lot of packaging to ensure the meat stays cold and safe during transit.",
+          "I understand your concern. We're always looking for more sustainable options and appreciate your feedback.",
+          "Currently, we don't have a return program for packaging, but it's something we're considering for the future. Thanks for bringing it up!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent did not provide education about thawing as it was not relevant to the customer's concern.",
+          "The agent appropriately acknowledged the customer's concern about packaging and provided a forward-looking statement."
+        ]
+      },
+      "expected": {
+        "feedback_acknowledged": true,
+        "information_provided": true,
+        "concern_noted": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not provide education about thawing as it was not relevant to the customer's concern.",
+          "The agent appropriately acknowledged the customer's concern about packaging and provided a forward-looking statement."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "drunk_customer_1",
+      "category": "impaired",
+      "simulation": {
+        "agent_responses": [
+          "Hey Tipsy Tom, it's Mike from The Meatery. Just checking on your order 10005 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Perfect. Enjoy those steaks!",
+          "I wish I could, but we can't do same-day deliveries. Keep an eye out for our next order!",
+          "Alright, take care!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "remained_professional": true,
+        "kept_brief": true,
+        "ended_appropriately": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "child_answers_1",
+      "category": "unexpected_answerer",
+      "simulation": {
+        "agent_responses": [
+          "Hey there! It's Mike from The Meatery. Is your dad around? I was just calling about his order.",
+          "No worries! Can you let him know Mike from The Meatery called about order 10006?",
+          "Got it, thanks! Just let him know I called.",
+          "Alright, take care!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": false
+        },
+        "detected_issues": [
+          "The agent was unable to speak directly with the customer to address the order."
+        ]
+      },
+      "expected": {
+        "appropriate_handling": true,
+        "child_safe_interaction": true,
+        "follow_up_noted": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent was unable to speak directly with the customer to address the order."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "technical_cooking_1",
+      "category": "expert_customer",
+      "simulation": {
+        "agent_responses": [
+          "Hey Sous Vide Steve, it's Mike from The Meatery. Just checking on your order 10007 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Nice choice. For sous vide at 129°F, I'd say about 2 to 4 hours should be perfect for a ribeye.",
+          "I'd go with a cast iron for a nice crust. Heat it up really hot before you sear.",
+          "After sous vide, you don't need much resting time since it's already evenly cooked. Just a couple of minutes should do."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "knowledgeable_response": true,
+        "technical_accuracy": true,
+        "engagement_maintained": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "order_modification_1",
+      "category": "change_request",
+      "simulation": {
+        "agent_responses": [
+          "Hey Modifier Mary, it's Mike from The Meatery. Just checking on your order 10008 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
+          "Sure, I can send you 10% off your next order. Text okay to this number?"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": true,
+          "discount_percentage": 10,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent did not directly address the request for a refund or credit for a future order, which could be seen as not fully resolving the customer's concern."
+        ]
+      },
+      "expected": {
+        "policy_explained": true,
+        "alternative_offered": true,
+        "solution_focused": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not directly address the request for a refund or credit for a future order, which could be seen as not fully resolving the customer's concern."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "gift_order_1",
+      "category": "gift",
+      "simulation": {
+        "agent_responses": [
+          "Hey Gifted Gary, it's Mike from The Meatery. Just checking on your order 10009 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Nice choice. Go gentle with wagyu - quick sear, maybe a minute per side max.",
+          "Sure, I can send you 10% off your next order. Text okay to this number?"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": true,
+          "discount_percentage": 10,
+          "education_provided": false,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent offered a discount without being prompted by the customer."
+        ]
+      },
+      "expected": {
+        "gift_acknowledged": true,
+        "confidence_built": true,
+        "tips_provided": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent offered a discount without being prompted by the customer."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "competitor_mention_1",
+      "category": "competition",
+      "simulation": {
+        "agent_responses": [
+          "Hey Comparing Cathy, it's Mike from The Meatery. Just checking on your order 10010 - everything arrive cold and sealed up okay?",
+          "Glad to hear it's okay! We focus on quality cuts, but I get the seasoning appeal. Need any cooking tips?",
+          "We use top-notch vacuum sealing to ensure freshness, but I appreciate the feedback on insulation. Anything else I can help with?",
+          "We believe in the quality of our meat. It's sourced from top farms, which is why it might be a bit more. Can I help with anything else?",
+          "Absolutely, we stand by our products. If there's ever an issue, we're here to make it right. Anything else you need?"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent did not offer cooking tips when the opportunity arose.",
+          "The agent could have provided more education about the quality of the meat."
+        ]
+      },
+      "expected": {
+        "professional_response": true,
+        "value_highlighted": true,
+        "confidence_maintained": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not offer cooking tips when the opportunity arose.",
+          "The agent could have provided more education about the quality of the meat."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "weather_concern_1",
+      "category": "external_factor",
+      "simulation": {
+        "agent_responses": [
+          "Hey Weather Wendy, it's Mike from The Meatery. Just checking on your order 10011 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
+          "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
+          "Great, enjoy the meat - it's gonna be delicious!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "reassurance_provided": true,
+        "education_given": true,
+        "concern_addressed": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "subscription_inquiry_1",
+      "category": "sales_opportunity",
+      "simulation": {
+        "agent_responses": [
+          "Hey Subscribe Sam, it's Mike from The Meatery. Just checking on your order 10012 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "Sure, I can send you 10% off your next order. Text okay to this number?",
+          "Actually, you're a regular - I'll make it 15%.",
+          "Alright, take care!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": false,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent did not directly address the request for setting up regular deliveries or subscriptions."
+        ]
+      },
+      "expected": {
+        "opportunity_recognized": true,
+        "follow_up_arranged": true,
+        "enthusiasm_shown": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "The agent did not directly address the request for setting up regular deliveries or subscriptions."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "portion_size_1",
+      "category": "product_question",
+      "simulation": {
+        "agent_responses": [
+          "Hey Portion Patty, it's Mike from The Meatery. Just checking on your order 10013 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "These ribeyes are pretty substantial! Generally, one ribeye can serve 2-3 people depending on appetite.",
+          "Absolutely, you can cut it in half. Just make sure to wrap the other half tightly if you're storing it.",
+          "Yes, you can freeze the other half. Just wrap it well to prevent freezer burn."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "helpful_guidance": true,
+        "practical_advice": true,
+        "storage_tips_given": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "medical_dietary_1",
+      "category": "health_concern",
+      "simulation": {
+        "agent_responses": [
+          "Hey Medical Mike, it's Mike from The Meatery. Just checking on your order 10014 - everything arrive cold and sealed up okay?",
+          "Got it. Our meats aren't pre-seasoned, so you should be good there.",
+          "Our cuts are just the meat itself, no added salt or treatments.",
+          "Meat does have some naturally occurring sodium, but it's minimal compared to processed foods.",
+          "Absolutely, our standard cuts are unseasoned. Just let us know when you order next time."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "No issues detected in the agent's responses."
+        ]
+      },
+      "expected": {
+        "health_priority": true,
+        "accurate_information": true,
+        "accommodation_noted": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 0,
+        "max_score": 3,
+        "issues": [
+          "No issues detected in the agent's responses."
+        ],
+        "pass_rate": "0.0"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "freezer_burn_1",
+      "category": "storage_issue",
+      "simulation": {
+        "agent_responses": [
+          "Hey Freezer Frank, it's Mike from The Meatery. Just checking on your order 10015 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "Is the vacuum seal still intact?",
+          "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
+          "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": true,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": false,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": [
+          "The agent did not explicitly end the call appropriately."
+        ]
+      },
+      "expected": {
+        "education_provided": true,
+        "storage_guidance": true,
+        "problem_diagnosed": true
+      },
+      "analysis": {
+        "matches": [
+          "✓ education_provided: true"
+        ],
+        "mismatches": [],
+        "overall_pass": false,
+        "score": 1,
+        "max_score": 3,
+        "issues": [
+          "The agent did not explicitly end the call appropriately."
+        ],
+        "pass_rate": "33.3"
+      },
+      "passed": false
+    },
+    {
+      "scenario_id": "special_cut_1",
+      "category": "product_knowledge",
+      "simulation": {
+        "agent_responses": [
+          "Hey Specialty Sue, it's Mike from The Meatery. Just checking on your order 10016 - everything arrive cold and sealed up okay?",
+          "Great! Picanha is a fantastic choice. It's not quite like a regular steak - it's best cooked with the fat cap on for flavor.",
+          "Not exactly. Keep the fat cap on while cooking for the best flavor.",
+          "After cooking, slice it against the grain for tenderness. Enjoy!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": true,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "specialized_knowledge": true,
+        "detailed_instruction": true,
+        "confidence_built": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "past_issue_followup_1",
+      "category": "retention",
+      "simulation": {
+        "agent_responses": [
+          "Hey Pete, it's Mike from The Meatery. Just checking on your order 10017 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "I'm really sorry about that. I'm glad this time is better. Let me send you a 15% discount for the trouble. What's the best number for that text?",
+          "I understand, and I'm glad you gave us another shot. We'll make sure this order is perfect.",
+          "Perfect. Enjoy those steaks!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "acknowledgment_made": true,
+        "relationship_rebuilt": true,
+        "retention_focused": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "quantity_error_1",
+      "category": "order_accuracy",
+      "simulation": {
+        "agent_responses": [
+          "Hey Quantity Quinn, it's Mike from The Meatery. Just checking on your order 10018 - everything arrive cold and sealed up okay?",
+          "Oh, I want to make sure everything's okay. What did you notice?",
+          "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
+          "We'll get that sorted right away. Really sorry about that."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": true,
+          "replacement_offered": true,
+          "discount_offered": true,
+          "discount_percentage": 15,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "verification_done": true,
+        "quick_resolution": true,
+        "apology_given": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "cultural_preference_1",
+      "category": "cultural",
+      "simulation": {
+        "agent_responses": [
+          "Hey Cultural Carlos, it's Mike from The Meatery. Just checking on your order 10019 - everything arrive cold and sealed up okay?",
+          "Great! Need any cooking tips for what you got, or you all set?",
+          "For carne asada, I'd recommend marinating it. A mix of lime juice, garlic, cilantro, and a bit of cumin works great.",
+          "Yes, definitely marinate it. Lime, cilantro, garlic, and cumin are perfect. Let it sit for a few hours for the best flavor.",
+          "Ah yes, lime and cilantro are key! Enjoy your carne asada, Cultural Carlos!"
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": true,
+          "call_ended_appropriately": true,
+          "escalation_handled": false
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "cultural_awareness": true,
+        "relevant_tips": true,
+        "connection_made": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    },
+    {
+      "scenario_id": "corporate_gift_1",
+      "category": "b2b_gift",
+      "simulation": {
+        "agent_responses": [
+          "Hey Carla, it's Mike from The Meatery. Just checking on your order 10020 - everything arrive cold and sealed up okay?",
+          "Great to hear they look good! I'll make a note to include gift messages next time.",
+          "Absolutely, I'll note that for your account.",
+          "Yes, we do offer custom packaging. I can have someone reach out to discuss options with you."
+        ],
+        "actions_taken": {
+          "voicemail_detected": false,
+          "diagnostic_questions_asked": false,
+          "refund_offered": false,
+          "replacement_offered": false,
+          "discount_offered": false,
+          "discount_percentage": null,
+          "education_provided": false,
+          "cooking_tips_given": false,
+          "call_ended_appropriately": true,
+          "escalation_handled": true
+        },
+        "conversation_quality": {
+          "stayed_in_character": true,
+          "followed_prompt": true,
+          "appropriate_length": true,
+          "professional_tone": true,
+          "empathy_shown": true,
+          "problem_solved": true
+        },
+        "detected_issues": []
+      },
+      "expected": {
+        "business_focus": true,
+        "account_notes": true,
+        "upsell_attempted": true
+      },
+      "analysis": {
+        "matches": [],
+        "mismatches": [],
+        "overall_pass": true,
+        "score": 0,
+        "max_score": 3,
+        "pass_rate": "0.0"
+      },
+      "passed": true
+    }
+  ]
+}
