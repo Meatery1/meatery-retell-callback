@@ -12,7 +12,7 @@ dotenv.config();
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 
 async function analyzeCall() {
-  const callId = 'call_55122a9725da5f10c6b05fa9ce9';  // The call we just placed
+  const callId = process.argv[2] || 'call_ec494fb06666b9a39d87e9e79c9';  // Latest call or pass as argument
   
   console.log('🔍 Analyzing your call with Mike...\n');
   console.log('Call ID:', callId);
