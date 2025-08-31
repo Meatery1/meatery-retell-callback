@@ -100,6 +100,55 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
   });
 }
 
+// --- Shopify helpers ---
+async function shopifyGetOrderByNumber(orderNumber) {
+  let num = String(orderNumber || "").trim();
+  if (!num) return null;
+  if (!num.startsWith("#")) num = `#${num}`;
+  const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
+  const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params: { name: num } });
+  const orders = r.data?.orders || [];
+  return orders[0] || null;
+}
+
+async function shopifyAppendNoteAndTags({ orderId, noteAppend, addTags = [] }) {
+  if (!orderId) return null;
+  // Fetch current order to merge tags and note
+  const getUrl = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders/${orderId}.json`;
+  const get = await axios.get(getUrl, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN } });
+  const order = get.data?.order || {};
+  const existingTags = String(order.tags || "").split(", ").filter(Boolean);
+  const mergedTags = Array.from(new Set([...existingTags, ...addTags.filter(Boolean)])).join(", ");
+  const existingNote = String(order.note || "");
+  const newNote = noteAppend ? (existingNote ? `${existingNote}\n${noteAppend}` : noteAppend) : existingNote;
+  const putUrl = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders/${orderId}.json`;
+  const payload = { order: { id: orderId, tags: mergedTags, note: newNote } };
+  const res = await axios.put(putUrl, payload, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN } });
+  return res.data?.order || null;
+}
+
+async function findLatestOrderForPhone(phoneRaw) {
+  const phone = String(phoneRaw || "").replace(/[^\d+]/g, "");
+  if (!phone) return null;
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
+  const params = {
+    status: "any",
+    financial_status: "paid",
+    updated_at_min: since,
+    fields: "id,name,order_number,customer,phone,shipping_address,current_total_price,created_at,closed_at,fulfillments,fulfillment_status,tags,note,line_items"
+  };
+  const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params });
+  const orders = r.data?.orders || [];
+  const match = orders
+    .filter((o) => {
+      const p = (o.phone || o?.customer?.phone || o?.shipping_address?.phone || "").replace(/[^\d+]/g, "");
+      return p && phone.endsWith(p.slice(-10)); // loose match on last 10 digits
+    })
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+  return match || null;
+}
+
 // --- Retell: create an outbound phone call
 async function placeConfirmationCall({ phone, customerName, orderNumber, agentId, fromNumber, metadata }) {
   /*
@@ -227,6 +276,38 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
     const event = JSON.parse(req.body.toString());
     console.log("Retell Webhook:", event.type, event?.data?.call_id);
     try { appendJsonl(callsLogPath, { received_at: new Date().toISOString(), ...event }); } catch (_) {}
+    // Best-effort Shopify side-effects
+    (async () => {
+      try {
+        const type = event?.type;
+        const m = event?.data?.metadata || {};
+        const analysis = event?.data?.analysis || {};
+        const structured = analysis?.structured || {};
+        const orderNumber = m.order_number || structured.order_number;
+        if (!orderNumber) return;
+        const order = await shopifyGetOrderByNumber(orderNumber);
+        if (!order?.id) return;
+        const addTags = [];
+        const notes = [];
+        const satisfiedScore = structured.satisfied_score ?? event?.data?.satisfied_score;
+        const hadIssue = structured.had_issue ?? event?.data?.had_issue;
+        const issueNotes = structured.issue_notes ?? event?.data?.issue_notes;
+        const preferredContact = structured.preferred_contact ?? event?.data?.preferred_contact;
+        if (typeof satisfiedScore === "number") notes.push(`Post-delivery satisfaction: ${satisfiedScore}/10`);
+        if (hadIssue) { addTags.push("post-delivery-issue"); notes.push(`Issue: ${issueNotes || "(details pending)"}`); }
+        if (preferredContact) notes.push(`Preferred contact: ${preferredContact}`);
+        if (notes.length || addTags.length) {
+          await shopifyAppendNoteAndTags({ orderId: order.id, noteAppend: notes.join(" | "), addTags });
+        }
+        if (structured.requested_opt_out === true || event?.data?.requested_opt_out === true) {
+          const phone = m.customer_phone || order?.phone || order?.shipping_address?.phone || order?.customer?.phone;
+          if (phone) {
+            const data = readJson(dncPath, { phones: [] });
+            if (!data.phones.includes(phone)) { data.phones.push(phone); writeJson(dncPath, data); }
+          }
+        }
+      } catch (_) { /* ignore webhook side-effect errors */ }
+    })();
     res.status(200).send("ok");
   } catch (e) {
     console.error("Webhook parse error", e);
@@ -355,13 +436,8 @@ app.get("/shopify/orders/:id", async (req, res) => {
 // Lookup order by order number (Shopify "name" field). Provide order_number like 1234 or #1234.
 app.get("/shopify/order-by-number", async (req, res) => {
   try {
-    let num = String(req.query?.order_number || "").trim();
-    if (!num) return res.status(400).json({ error: "order_number required" });
-    if (!num.startsWith("#")) num = `#${num}`;
-    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
-    const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params: { name: num } });
-    const orders = r.data.orders || [];
-    res.json({ orders });
+    const order = await shopifyGetOrderByNumber(req.query?.order_number);
+    res.json({ orders: order ? [order] : [] });
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
   }
@@ -402,6 +478,72 @@ app.post("/call/batch", async (req, res) => {
       }
     }
     res.json({ count: results.length, results });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// --- Flow function endpoints for Conversation Flow nodes ---
+app.get("/flow/order-context", async (req, res) => {
+  try {
+    const orderNumber = req.query?.order_number;
+    const phone = req.query?.phone;
+    let order = null;
+    if (orderNumber) order = await shopifyGetOrderByNumber(orderNumber);
+    if (!order && phone) order = await findLatestOrderForPhone(phone);
+    if (!order) return res.status(404).json({ error: "order_not_found" });
+    const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
+    const itemsSummary = lineItems.slice(0, 5).map(li => `${li.quantity}x ${li.title}`).join(", ");
+    const primaryItem = lineItems[0]?.title || null;
+    const deliveredAt = (order.fulfillments || []).find(f => (f?.shipment_status || "") === "delivered")?.updated_at || null;
+    res.json({
+      ok: true,
+      order_id: order.id,
+      order_number: order.order_number,
+      customer_name: [order?.customer?.first_name, order?.customer?.last_name].filter(Boolean).join(" ") || "there",
+      customer_phone: order?.phone || order?.shipping_address?.phone || order?.customer?.phone || null,
+      items_summary: itemsSummary,
+      primary_item: primaryItem,
+      delivered_at: deliveredAt
+    });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+app.post("/flow/capture-feedback", async (req, res) => {
+  try {
+    const { order_number, satisfied_score, had_issue, issue_notes, preferred_contact, requested_opt_out } = req.body || {};
+    const order = await shopifyGetOrderByNumber(order_number);
+    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    const addTags = [];
+    const notes = [];
+    if (typeof satisfied_score === "number") notes.push(`Post-delivery satisfaction: ${satisfied_score}/10`);
+    if (had_issue) { addTags.push("post-delivery-issue"); notes.push(`Issue: ${issue_notes || "(details pending)"}`); }
+    if (preferred_contact) notes.push(`Preferred contact: ${preferred_contact}`);
+    await shopifyAppendNoteAndTags({ orderId: order.id, noteAppend: notes.join(" | "), addTags });
+    if (requested_opt_out === true) {
+      const phone = order?.phone || order?.shipping_address?.phone || order?.customer?.phone;
+      if (phone) {
+        const data = readJson(dncPath, { phones: [] });
+        if (!data.phones.includes(phone)) { data.phones.push(phone); writeJson(dncPath, data); }
+      }
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+app.post("/flow/request-replacement", async (req, res) => {
+  try {
+    const { order_number, item_title, quantity = 1, reason } = req.body || {};
+    const order = await shopifyGetOrderByNumber(order_number);
+    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    const tag = "replacement-requested";
+    const note = `Replacement requested: ${quantity}x ${item_title || "(unspecified)"}${reason ? ` | Reason: ${reason}` : ""}`;
+    await shopifyAppendNoteAndTags({ orderId: order.id, noteAppend: note, addTags: [tag] });
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
   }
