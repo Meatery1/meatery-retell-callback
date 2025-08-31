@@ -22,6 +22,8 @@
       <div class="row"><label>Order #</label><input id="order" placeholder="12345" /></div>
       <div class="row"><label>Agent ID (optional)</label><input id="agentId" placeholder="agent_..." /></div>
       <div class="row"><label>From Number (E.164) (optional)</label><input id="fromNumber" placeholder="+16195551234" /></div>
+      <div class="row"><label>Max Follow-up Questions (optional)</label><input id="maxFollowups" type="number" min="0" max="10" placeholder="2" /></div>
+      <div class="row"><label>Resolution Preference (optional)</label><input id="resolutionPref" placeholder="replace|refund|escalate" /></div>
       <div class="row"><button id="call">Place Call</button></div>
     </section>
 
@@ -30,6 +32,8 @@
       <div class="row"><label>Lookback Hours</label><input id="hours" type="number" value="48" /></div>
       <div class="row"><label>Agent ID (optional)</label><input id="batchAgentId" placeholder="agent_..." /></div>
       <div class="row"><label>From Number (E.164) (optional)</label><input id="batchFromNumber" placeholder="+16195551234" /></div>
+      <div class="row"><label>Max Follow-up Questions (optional)</label><input id="batchMaxFollowups" type="number" min="0" max="10" placeholder="2" /></div>
+      <div class="row"><label>Resolution Preference (optional)</label><input id="batchResolutionPref" placeholder="replace|refund|escalate" /></div>
       <div class="row">
         <button id="preview">Preview Candidates</button>
         <button id="batch">Start Batch Calls</button>
@@ -100,7 +104,11 @@
             name: el('name').value,
             orderNumber: el('order').value,
             agentId: el('agentId').value || undefined,
-            fromNumber: el('fromNumber').value || undefined
+            fromNumber: el('fromNumber').value || undefined,
+            metadata: {
+              max_followup_questions: el('maxFollowups').value ? Number(el('maxFollowups').value) : undefined,
+              resolution_preference: el('resolutionPref').value || undefined
+            }
           })});
           out.textContent = JSON.stringify(data, null, 2);
         } catch (e) { out.textContent = e.message; }
@@ -121,7 +129,9 @@
           const data = await api('/call/batch', { method: 'POST', body: JSON.stringify({
             hours: Number(el('hours').value || 48),
             agentId: el('batchAgentId').value || undefined,
-            fromNumber: el('batchFromNumber').value || undefined
+            fromNumber: el('batchFromNumber').value || undefined,
+            max_followup_questions: el('batchMaxFollowups').value ? Number(el('batchMaxFollowups').value) : undefined,
+            resolution_preference: el('batchResolutionPref').value || undefined
           })});
           out.textContent = JSON.stringify(data, null, 2);
         } catch (e) { out.textContent = e.message; }

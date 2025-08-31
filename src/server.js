@@ -111,7 +111,9 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
     order_number: orderNumber,
     primary_item: metadata?.primary_item,
     items_summary: metadata?.items_summary,
-    delivered_at: metadata?.delivered_at
+    delivered_at: metadata?.delivered_at,
+    max_followup_questions: metadata?.max_followup_questions,
+    resolution_preference: metadata?.resolution_preference
   };
 
   // Remove undefined values so we only pass concrete variables
