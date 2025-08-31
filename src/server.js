@@ -65,7 +65,7 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
     status: "any",
     financial_status: "paid",
     updated_at_min: since,
-    fields: "id,order_number,customer,phone,shipping_address,current_total_price,created_at,closed_at,fulfillments,fulfillment_status,source_name,tags,note"
+    fields: "id,order_number,customer,phone,shipping_address,current_total_price,created_at,closed_at,fulfillments,fulfillment_status,source_name,tags,note,line_items"
   };
   const res = await axios.get(url, {
     headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN },
@@ -81,6 +81,10 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
       return ss === "delivered"; // ensure post-delivery confirmation
     });
     if (!delivered) return [];
+    const lineItems = Array.isArray(o.line_items) ? o.line_items : [];
+    const primaryItem = lineItems[0]?.title || null;
+    const itemsSummary = lineItems.slice(0, 5).map(li => `${li.quantity}x ${li.title}`).join(", ");
+    const deliveredAt = (o.fulfillments || []).find(f => (f?.shipment_status || "") === "delivered")?.updated_at || null;
     return [{
       order_id: o.id,
       order_number: o.order_number,
@@ -88,7 +92,10 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
       name: [o?.customer?.first_name, o?.customer?.last_name].filter(Boolean).join(" ") || "there",
       total: o.current_total_price,
       created_at: o.created_at,
-      tags: (o.tags || "")
+      tags: (o.tags || ""),
+      primary_item: primaryItem,
+      items_summary: itemsSummary,
+      delivered_at: deliveredAt
     }];
   });
 }
@@ -101,7 +108,10 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
   */
   const vars = {
     customer_name: customerName,
-    order_number: orderNumber
+    order_number: orderNumber,
+    primary_item: metadata?.primary_item,
+    items_summary: metadata?.items_summary,
+    delivered_at: metadata?.delivered_at
   };
 
   const result = await retell.calls.createPhoneCall({
@@ -184,7 +194,12 @@ app.post("/tasks/call-recent", async (req, res) => {
         continue;
       }
       try {
-        const r = await placeConfirmationCall({ phone: c.phone, customerName: c.name, orderNumber: c.order_number });
+        const r = await placeConfirmationCall({
+          phone: c.phone,
+          customerName: c.name,
+          orderNumber: c.order_number,
+          metadata: { primary_item: c.primary_item, items_summary: c.items_summary, delivered_at: c.delivered_at }
+        });
         results.push({ ok: true, call_id: r.call_id, to: c.phone, order_number: c.order_number });
       } catch (err) {
         results.push({ ok: false, to: c.phone, error: err?.response?.data || err.message });
@@ -233,6 +248,111 @@ app.get("/candidates", async (req, res) => {
       return !dnc.has(c.phone) && !hasOptOutTag;
     });
     res.json({ total: candidates.length, callable: filtered.length, candidates: filtered });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// --- Shopify data endpoints: shop, products, customers, orders ---
+app.get("/shopify/shop", async (_req, res) => {
+  try {
+    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/shop.json`;
+    const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN } });
+    res.json(r.data);
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+app.get("/shopify/products", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query?.limit || 50), 250);
+    const page_info = req.query?.page_info;
+    const base = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/products.json`;
+    const headers = { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN } };
+    if (page_info) {
+      const r = await axios.get(`${base}?limit=${limit}&page_info=${encodeURIComponent(page_info)}`, headers);
+      res.json({ products: r.data.products || [], link: r.headers?.link || null });
+    } else {
+      const r = await axios.get(base, { ...headers, params: { limit } });
+      res.json({ products: r.data.products || [], link: r.headers?.link || null });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+app.get("/shopify/products/:id", async (req, res) => {
+  try {
+    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/products/${req.params.id}.json`;
+    const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN } });
+    res.json(r.data);
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+app.get("/shopify/customers", async (req, res) => {
+  try {
+    const email = String(req.query?.email || "").trim();
+    const id = String(req.query?.id || "").trim();
+    if (id) {
+      const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers/${id}.json`;
+      const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN } });
+      return res.json(r.data);
+    }
+    if (email) {
+      const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers/search.json`;
+      const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params: { query: `email:${email}` } });
+      return res.json({ customers: r.data.customers || [] });
+    }
+    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers.json`;
+    const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params: { limit: 50 } });
+    res.json({ customers: r.data.customers || [] });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+app.get("/shopify/orders", async (req, res) => {
+  try {
+    const params = {
+      status: req.query?.status || "any",
+      financial_status: req.query?.financial_status,
+      fulfillment_status: req.query?.fulfillment_status,
+      created_at_min: req.query?.created_at_min,
+      updated_at_min: req.query?.updated_at_min,
+      limit: Math.min(Number(req.query?.limit || 50), 250),
+      fields: req.query?.fields
+    };
+    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
+    const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params });
+    res.json({ orders: r.data.orders || [] });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+app.get("/shopify/orders/:id", async (req, res) => {
+  try {
+    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders/${req.params.id}.json`;
+    const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN } });
+    res.json(r.data);
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// Lookup order by order number (Shopify "name" field). Provide order_number like 1234 or #1234.
+app.get("/shopify/order-by-number", async (req, res) => {
+  try {
+    let num = String(req.query?.order_number || "").trim();
+    if (!num) return res.status(400).json({ error: "order_number required" });
+    if (!num.startsWith("#")) num = `#${num}`;
+    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
+    const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params: { name: num } });
+    const orders = r.data.orders || [];
+    res.json({ orders });
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
   }
