@@ -101,7 +101,7 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
 }
 
 // --- Retell: create an outbound phone call
-async function placeConfirmationCall({ phone, customerName, orderNumber, agentId, fromNumberId, metadata }) {
+async function placeConfirmationCall({ phone, customerName, orderNumber, agentId, fromNumber, metadata }) {
   /*
     Minimal payload using Retell "Create Phone Call" API via SDK.
     The number must be bound to an outbound agent in Retell dashboard.
@@ -117,8 +117,8 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
   const result = await retell.call.createPhoneCall({
     // Required
     to_number: phone,
-    from_number_id: fromNumberId || process.env.RETELL_NUMBER_ID,
-    agent_id: agentId || process.env.RETELL_AGENT_ID,
+    from_number: fromNumber || process.env.RETELL_FROM_NUMBER,
+    override_agent_id: agentId || process.env.RETELL_AGENT_ID,
     // Optional runtime variables
     metadata: { source: "meatery-post-delivery", ...vars, ...(metadata || {}) },
     // Call config overrides for this call only
@@ -227,10 +227,10 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
 
 // Simple in-memory test endpoint to place a single call
 app.post("/call", async (req, res) => {
-  const { phone, name, orderNumber, agentId, fromNumberId, metadata } = req.body || {};
+  const { phone, name, orderNumber, agentId, fromNumber, metadata } = req.body || {};
   if (!phone) return res.status(400).json({ error: "phone required" });
   try {
-    const r = await placeConfirmationCall({ phone, customerName: name || "there", orderNumber, agentId, fromNumberId, metadata });
+    const r = await placeConfirmationCall({ phone, customerName: name || "there", orderNumber, agentId, fromNumber, metadata });
     res.json(r);
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
@@ -361,7 +361,7 @@ app.get("/shopify/order-by-number", async (req, res) => {
 // Batch call with optional overrides
 app.post("/call/batch", async (req, res) => {
   try {
-    const { hours = 48, agentId, fromNumberId } = req.body || {};
+    const { hours = 48, agentId, fromNumber } = req.body || {};
     if (!inCallWindow()) return res.status(403).json({ error: "Outside calling window" });
     const candidates = await fetchRecentDeliveredOrders({ hours });
     const dnc = new Set(readJson(dncPath, { phones: [] }).phones);
@@ -373,7 +373,7 @@ app.post("/call/batch", async (req, res) => {
         continue;
       }
       try {
-        const r = await placeConfirmationCall({ phone: c.phone, customerName: c.name, orderNumber: c.order_number, agentId, fromNumberId });
+        const r = await placeConfirmationCall({ phone: c.phone, customerName: c.name, orderNumber: c.order_number, agentId, fromNumber });
         results.push({ ok: true, call_id: r.call_id, to: c.phone, order_number: c.order_number });
       } catch (err) {
         results.push({ ok: false, to: c.phone, error: err?.response?.data || err.message });

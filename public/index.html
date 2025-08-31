@@ -21,7 +21,7 @@
       <div class="row"><label>Name</label><input id="name" placeholder="Nick" /></div>
       <div class="row"><label>Order #</label><input id="order" placeholder="12345" /></div>
       <div class="row"><label>Agent ID (optional)</label><input id="agentId" placeholder="agent_..." /></div>
-      <div class="row"><label>From Number ID (optional)</label><input id="fromId" placeholder="pn_..." /></div>
+      <div class="row"><label>From Number (E.164) (optional)</label><input id="fromNumber" placeholder="+16195551234" /></div>
       <div class="row"><button id="call">Place Call</button></div>
     </section>
 
@@ -29,7 +29,7 @@
       <h3>Batch Calls</h3>
       <div class="row"><label>Lookback Hours</label><input id="hours" type="number" value="48" /></div>
       <div class="row"><label>Agent ID (optional)</label><input id="batchAgentId" placeholder="agent_..." /></div>
-      <div class="row"><label>From Number ID (optional)</label><input id="batchFromId" placeholder="pn_..." /></div>
+      <div class="row"><label>From Number (E.164) (optional)</label><input id="batchFromNumber" placeholder="+16195551234" /></div>
       <div class="row">
         <button id="preview">Preview Candidates</button>
         <button id="batch">Start Batch Calls</button>
@@ -100,7 +100,7 @@
             name: el('name').value,
             orderNumber: el('order').value,
             agentId: el('agentId').value || undefined,
-            fromNumberId: el('fromId').value || undefined
+            fromNumber: el('fromNumber').value || undefined
           })});
           out.textContent = JSON.stringify(data, null, 2);
         } catch (e) { out.textContent = e.message; }
@@ -121,7 +121,7 @@
           const data = await api('/call/batch', { method: 'POST', body: JSON.stringify({
             hours: Number(el('hours').value || 48),
             agentId: el('batchAgentId').value || undefined,
-            fromNumberId: el('batchFromId').value || undefined
+            fromNumber: el('batchFromNumber').value || undefined
           })});
           out.textContent = JSON.stringify(data, null, 2);
         } catch (e) { out.textContent = e.message; }
