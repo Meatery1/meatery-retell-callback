@@ -115,11 +115,52 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
 async function shopifyGetOrderByNumber(orderNumber) {
   let num = String(orderNumber || "").trim();
   if (!num) return null;
-  if (!num.startsWith("#")) num = `#${num}`;
-  const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
-  const r = await axios.get(url, { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, params: { name: num } });
-  const orders = r.data?.orders || [];
-  return orders[0] || null;
+  
+  // Try different formats since Shopify can be picky
+  const formats = [
+    num,                           // As provided
+    num.startsWith("#") ? num : `#${num}`,  // With #
+    num.replace("#", ""),          // Without #
+  ];
+  
+  for (const format of formats) {
+    try {
+      const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
+      const r = await axios.get(url, { 
+        headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, 
+        params: { name: format, status: 'any' } 
+      });
+      const orders = r.data?.orders || [];
+      if (orders.length > 0) {
+        console.log(`Found order with format: ${format}`);
+        return orders[0];
+      }
+    } catch (e) {
+      // Try next format
+    }
+  }
+  
+  // If not found by name, try by order_number field
+  try {
+    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
+    const r = await axios.get(url, { 
+      headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN }, 
+      params: { status: 'any', limit: 250 } 
+    });
+    const orders = r.data?.orders || [];
+    const match = orders.find(o => 
+      String(o.order_number) === num || 
+      String(o.name).replace("#", "") === num.replace("#", "")
+    );
+    if (match) {
+      console.log(`Found order by searching: ${match.name}`);
+      return match;
+    }
+  } catch (e) {
+    console.error('Order search error:', e.message);
+  }
+  
+  return null;
 }
 
 async function shopifyAppendNoteAndTags({ orderId, noteAppend, addTags = [] }) {
@@ -169,6 +210,7 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
   const vars = {
     customer_name: customerName,
     order_number: orderNumber,
+    customer_phone: phone,  // Add phone for Shopify tool lookups
     primary_item: metadata?.primary_item,
     items_summary: metadata?.items_summary,
     delivered_at: metadata?.delivered_at,
@@ -300,14 +342,21 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
       event = JSON.parse(req.body.toString());
     } else if (typeof req.body === 'string') {
       event = JSON.parse(req.body);
-    } else if (typeof req.body === 'object') {
+    } else if (typeof req.body === 'object' && req.body !== null) {
       // Body is already parsed (shouldn't happen with our middleware fix, but just in case)
       event = req.body;
     } else {
+      console.error('Invalid request body type:', typeof req.body);
       throw new Error('Invalid request body type');
     }
     
-    console.log("Retell Webhook:", event.type, event?.data?.call_id);
+    // Debug logging to see what we're getting
+    if (!event || typeof event !== 'object') {
+      console.error("Webhook received invalid event:", event);
+      return res.status(400).send("invalid-event");
+    }
+    
+    console.log("Retell Webhook:", event.type || 'NO_TYPE', event?.data?.call_id || 'NO_CALL_ID');
     try { appendJsonl(callsLogPath, { received_at: new Date().toISOString(), ...event }); } catch (_) {}
     // Best-effort Shopify side-effects
     (async () => {
@@ -665,19 +714,30 @@ app.post("/tools/check-discount-eligibility", async (req, res) => {
 });
 
 // --- Flow function endpoints for Conversation Flow nodes ---
-app.get("/flow/order-context", async (req, res) => {
+// Support both GET and POST for Retell custom tools
+async function handleOrderContext(req, res) {
   try {
-    const orderNumber = req.query?.order_number;
-    const phone = req.query?.phone;
+    // Accept params from either query (GET) or body (POST)
+    const params = req.method === 'GET' ? req.query : req.body;
+    const orderNumber = params?.order_number;
+    const phone = params?.phone || params?.customer_phone;
+    
+    console.log(`Order context lookup: order=${orderNumber}, phone=${phone}`);
+    
     let order = null;
     if (orderNumber) order = await shopifyGetOrderByNumber(orderNumber);
     if (!order && phone) order = await findLatestOrderForPhone(phone);
-    if (!order) return res.status(404).json({ error: "order_not_found" });
+    if (!order) {
+      console.log(`Order not found: ${orderNumber || phone}`);
+      return res.status(404).json({ error: "order_not_found", message: "Could not find that order" });
+    }
+    
     const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
     const itemsSummary = lineItems.slice(0, 5).map(li => `${li.quantity}x ${li.title}`).join(", ");
     const primaryItem = lineItems[0]?.title || null;
     const deliveredAt = (order.fulfillments || []).find(f => (f?.shipment_status || "") === "delivered")?.updated_at || null;
-    res.json({
+    
+    const response = {
       ok: true,
       order_id: order.id,
       order_number: order.order_number,
@@ -685,12 +745,20 @@ app.get("/flow/order-context", async (req, res) => {
       customer_phone: order?.phone || order?.shipping_address?.phone || order?.customer?.phone || null,
       items_summary: itemsSummary,
       primary_item: primaryItem,
-      delivered_at: deliveredAt
-    });
+      delivered_at: deliveredAt,
+      speak: `Your order contains ${itemsSummary}`  // Add speech response for Retell
+    };
+    
+    console.log(`Order found: ${order.name} - ${itemsSummary}`);
+    res.json(response);
   } catch (e) {
+    console.error('Order context error:', e.message);
     res.status(500).json({ error: e?.response?.data || e.message });
   }
-});
+}
+
+app.get("/flow/order-context", handleOrderContext);
+app.post("/flow/order-context", handleOrderContext);
 
 app.post("/flow/capture-feedback", async (req, res) => {
   try {
