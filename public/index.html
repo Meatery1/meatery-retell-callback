@@ -44,6 +44,26 @@
         <button id="viewAgentBtn">View Agent</button>
         <button id="syncAgentBtn">Sync Defaults (+Webhook)</button>
       </div>
+      <div class="row">
+        <label>Quick Tuning</label>
+        <div>
+          <label>Voice Speed</label>
+          <input id="voiceSpeed" type="number" min="0.5" max="1.6" step="0.05" value="0.85" />
+        </div>
+        <div>
+          <label>Voice Temperature</label>
+          <input id="voiceTemp" type="number" min="0.5" max="1.5" step="0.05" value="0.7" />
+        </div>
+        <div>
+          <label>Backchannel Freq</label>
+          <input id="backFreq" type="number" min="0" max="1" step="0.05" value="0.35" />
+        </div>
+        <div>
+          <label>Interruption Sensitivity</label>
+          <input id="interrupt" type="number" min="0" max="1" step="0.05" value="0.85" />
+        </div>
+        <button id="applyTuningBtn">Apply Tuning</button>
+      </div>
     </section>
 
     <section>
@@ -58,6 +78,7 @@
     <section>
       <h3>Calls Summary</h3>
       <div class="row"><button id="summaryBtn">Refresh Summary</button></div>
+      <div class="row"><button id="recentBtn">Recent Webhook Events</button></div>
     </section>
 
     <h3>Output</h3>
@@ -116,6 +137,20 @@
         try { out.textContent = JSON.stringify(await api('/agents/' + el('agentIdView').value + '/sync-defaults', { method: 'POST', body: JSON.stringify({ overrideWebhookToApp: true }) }), null, 2); } catch (e) { out.textContent = e.message; }
       };
 
+      el('applyTuningBtn').onclick = async () => {
+        try {
+          const id = el('agentIdView').value;
+          const body = {
+            voice_speed: Number(el('voiceSpeed').value),
+            voice_temperature: Number(el('voiceTemp').value),
+            backchannel_frequency: Number(el('backFreq').value),
+            interruption_sensitivity: Number(el('interrupt').value)
+          };
+          const res = await api('/agents/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+          out.textContent = JSON.stringify(res, null, 2);
+        } catch (e) { out.textContent = e.message; }
+      };
+
       el('dncAddBtn').onclick = async () => {
         try { out.textContent = JSON.stringify(await api('/opt-out', { method: 'POST', body: JSON.stringify({ phone: el('dncPhone').value }) }), null, 2); } catch (e) { out.textContent = e.message; }
       };
@@ -125,6 +160,9 @@
 
       el('summaryBtn').onclick = async () => {
         try { out.textContent = JSON.stringify(await api('/calls/summary'), null, 2); } catch (e) { out.textContent = e.message; }
+      };
+      el('recentBtn').onclick = async () => {
+        try { out.textContent = JSON.stringify(await api('/calls/recent-log?limit=50'), null, 2); } catch (e) { out.textContent = e.message; }
       };
     </script>
   </body>

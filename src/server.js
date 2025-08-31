@@ -428,5 +428,22 @@ app.get("/calls/summary", (_req, res) => {
   }
 });
 
+// Return the most recent webhook events from our JSONL log
+app.get("/calls/recent-log", (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query?.limit || 25), 200);
+    if (!fs.existsSync(callsLogPath)) return res.json({ events: [] });
+    const lines = fs.readFileSync(callsLogPath, "utf8").split(/\n/).filter(Boolean);
+    const slice = lines.slice(-limit);
+    const events = [];
+    for (const line of slice) {
+      try { events.push(JSON.parse(line)); } catch (_) { /* skip bad line */ }
+    }
+    res.json({ events });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const port = process.env.PORT || 8080;
 app.listen(port, () => console.log(`Meatery Retell server listening on :${port}`));
