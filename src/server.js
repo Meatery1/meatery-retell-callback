@@ -24,6 +24,8 @@ app.use((req, res, next) => {
     bodyParser.json({ limit: "2mb" })(req, res, next);
   }
 });
+// Also ensure URL encoded params are parsed
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
@@ -719,6 +721,15 @@ async function handleOrderContext(req, res) {
   try {
     // Accept params from either query (GET) or body (POST)
     const params = req.method === 'GET' ? req.query : req.body;
+    
+    // Debug what we're receiving
+    console.log('Order context request:', {
+      method: req.method,
+      body: req.body,
+      query: req.query,
+      headers: req.headers['content-type']
+    });
+    
     const orderNumber = params?.order_number;
     const phone = params?.phone || params?.customer_phone;
     
