@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Retell Calls</title>
+    <style>
+      body { font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+      label { display: block; margin: 8px 0 4px; }
+      input, button { font-size: 16px; padding: 8px; }
+      .row { margin-bottom: 12px; }
+      pre { background: #f5f5f5; padding: 12px; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Meatery Retell Control Panel</h1>
+
+    <section>
+      <h3>Single Call</h3>
+      <div class="row"><label>Phone</label><input id="phone" placeholder="+16195551234" /></div>
+      <div class="row"><label>Name</label><input id="name" placeholder="Nick" /></div>
+      <div class="row"><label>Order #</label><input id="order" placeholder="12345" /></div>
+      <div class="row"><label>Agent ID (optional)</label><input id="agentId" placeholder="agent_..." /></div>
+      <div class="row"><label>From Number ID (optional)</label><input id="fromId" placeholder="pn_..." /></div>
+      <div class="row"><button id="call">Place Call</button></div>
+    </section>
+
+    <section>
+      <h3>Batch Calls</h3>
+      <div class="row"><label>Lookback Hours</label><input id="hours" type="number" value="48" /></div>
+      <div class="row"><label>Agent ID (optional)</label><input id="batchAgentId" placeholder="agent_..." /></div>
+      <div class="row"><label>From Number ID (optional)</label><input id="batchFromId" placeholder="pn_..." /></div>
+      <div class="row">
+        <button id="preview">Preview Candidates</button>
+        <button id="batch">Start Batch Calls</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Agents</h3>
+      <div class="row">
+        <button id="listAgentsBtn">List Agents</button>
+        <input id="agentIdView" placeholder="agent_..." />
+        <button id="viewAgentBtn">View Agent</button>
+        <button id="syncAgentBtn">Sync Defaults (+Webhook)</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Opt-out / DNC</h3>
+      <div class="row">
+        <input id="dncPhone" placeholder="+1..." />
+        <button id="dncAddBtn">Add to DNC</button>
+        <button id="dncListBtn">List DNC</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Calls Summary</h3>
+      <div class="row"><button id="summaryBtn">Refresh Summary</button></div>
+    </section>
+
+    <h3>Output</h3>
+    <pre id="out"></pre>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+      const out = el('out');
+      async function api(path, opts={}) {
+        const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers||{}) } });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      }
+      el('call').onclick = async () => {
+        out.textContent = 'Calling...';
+        try {
+          const data = await api('/call', { method: 'POST', body: JSON.stringify({
+            phone: el('phone').value,
+            name: el('name').value,
+            orderNumber: el('order').value,
+            agentId: el('agentId').value || undefined,
+            fromNumberId: el('fromId').value || undefined
+          })});
+          out.textContent = JSON.stringify(data, null, 2);
+        } catch (e) { out.textContent = e.message; }
+      };
+
+      el('preview').onclick = async () => {
+        out.textContent = 'Loading candidates...';
+        try {
+          const hours = Number(el('hours').value || 48);
+          const data = await api('/candidates?hours=' + hours);
+          out.textContent = JSON.stringify(data, null, 2);
+        } catch (e) { out.textContent = e.message; }
+      };
+
+      el('batch').onclick = async () => {
+        out.textContent = 'Starting batch...';
+        try {
+          const data = await api('/call/batch', { method: 'POST', body: JSON.stringify({
+            hours: Number(el('hours').value || 48),
+            agentId: el('batchAgentId').value || undefined,
+            fromNumberId: el('batchFromId').value || undefined
+          })});
+          out.textContent = JSON.stringify(data, null, 2);
+        } catch (e) { out.textContent = e.message; }
+      };
+
+      el('listAgentsBtn').onclick = async () => {
+        try { out.textContent = JSON.stringify(await api('/agents'), null, 2); } catch (e) { out.textContent = e.message; }
+      };
+      el('viewAgentBtn').onclick = async () => {
+        try { out.textContent = JSON.stringify(await api('/agents/' + el('agentIdView').value), null, 2); } catch (e) { out.textContent = e.message; }
+      };
+      el('syncAgentBtn').onclick = async () => {
+        try { out.textContent = JSON.stringify(await api('/agents/' + el('agentIdView').value + '/sync-defaults', { method: 'POST', body: JSON.stringify({ overrideWebhookToApp: true }) }), null, 2); } catch (e) { out.textContent = e.message; }
+      };
+
+      el('dncAddBtn').onclick = async () => {
+        try { out.textContent = JSON.stringify(await api('/opt-out', { method: 'POST', body: JSON.stringify({ phone: el('dncPhone').value }) }), null, 2); } catch (e) { out.textContent = e.message; }
+      };
+      el('dncListBtn').onclick = async () => {
+        try { out.textContent = JSON.stringify(await api('/dnc'), null, 2); } catch (e) { out.textContent = e.message; }
+      };
+
+      el('summaryBtn').onclick = async () => {
+        try { out.textContent = JSON.stringify(await api('/calls/summary'), null, 2); } catch (e) { out.textContent = e.message; }
+      };
+    </script>
+  </body>
+  </html>
+
+

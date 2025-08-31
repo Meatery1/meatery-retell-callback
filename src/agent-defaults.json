@@ -1,0 +1,16 @@
+{
+  "agent_name": "Meatery Post-Delivery Concierge",
+  "language": "en-US",
+  "responsiveness": 1,
+  "interruption_sensitivity": 0.8,
+  "end_call_after_silence_ms": 600000,
+  "enable_backchannel": true,
+  "backchannel_frequency": 0.8,
+  "voice_speed": 1,
+  "voice_temperature": 1,
+  "normalize_for_speech": true,
+  "boosted_keywords": ["The Meatery", "USDA Prime", "Wagyu", "ribeye", "marbling"],
+  "reminder_max_count": 1,
+  "reminder_trigger_ms": 12000
+}
+
