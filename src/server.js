@@ -24,8 +24,14 @@ app.use((req, res, next) => {
     bodyParser.json({ limit: "2mb" })(req, res, next);
   }
 });
-// Also ensure URL encoded params are parsed
-app.use(bodyParser.urlencoded({ extended: true }));
+// Also ensure URL encoded params are parsed (but not for webhook)
+app.use((req, res, next) => {
+  if (req.path === '/webhooks/retell') {
+    next();
+  } else {
+    bodyParser.urlencoded({ extended: true })(req, res, next);
+  }
+});
 app.use(express.static("public"));
 
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
@@ -340,10 +346,22 @@ app.post("/tasks/call-recent", async (req, res) => {
 // Retell webhook receiver (call_started / call_ended / call_analyzed)
 app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, res) => {
   try {
+    // Debug what we're receiving
+    if (!req.body || req.body.length === 0) {
+      console.log("Retell Webhook: Empty body received (possible health check)");
+      return res.status(200).send("ok");
+    }
+    
     // Parse the raw body
     let event;
     if (Buffer.isBuffer(req.body)) {
-      event = JSON.parse(req.body.toString());
+      const bodyStr = req.body.toString();
+      // Check if it's actually JSON
+      if (!bodyStr.trim().startsWith('{') && !bodyStr.trim().startsWith('[')) {
+        console.log("Retell Webhook: Non-JSON body received:", bodyStr.substring(0, 100));
+        return res.status(200).send("ok");
+      }
+      event = JSON.parse(bodyStr);
     } else if (typeof req.body === 'string') {
       event = JSON.parse(req.body);
     } else if (typeof req.body === 'object' && req.body !== null) {
@@ -360,7 +378,12 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
       return res.status(400).send("invalid-event");
     }
     
-    console.log("Retell Webhook:", event.type || 'NO_TYPE', event?.data?.call_id || 'NO_CALL_ID');
+    // Only log if it's actually a Retell event
+    if (event.type && event.data) {
+      console.log("Retell Webhook:", event.type, event.data?.call_id || 'no-call-id');
+    } else {
+      console.log("Retell Webhook: Unexpected format -", JSON.stringify(event).substring(0, 200));
+    }
     try { appendJsonl(callsLogPath, { received_at: new Date().toISOString(), ...event }); } catch (_) {}
     // Best-effort Shopify side-effects
     (async () => {
