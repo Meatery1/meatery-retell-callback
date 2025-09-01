@@ -11,7 +11,15 @@ import {
   sendReplacementTicket 
 } from './src/email-service.js';
 
+// Load environment variables first
 dotenv.config();
+
+// Debug: Check if env vars are loaded
+console.log('Environment check:', {
+  SMTP_HOST: process.env.SMTP_HOST ? '✓ Set' : '✗ Missing',
+  SMTP_USER: process.env.SMTP_USER ? '✓ Set' : '✗ Missing',
+  SMTP_PASS: process.env.SMTP_PASS ? '✓ Set' : '✗ Missing'
+});
 
 async function testEmailTickets() {
   console.log('🧪 Testing Email Ticket System...\n');

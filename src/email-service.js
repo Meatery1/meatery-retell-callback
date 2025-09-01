@@ -16,60 +16,7 @@ let transporter = null;
  */
 export async function initializeEmailService() {
   try {
-    // Check if service account credentials are provided via env
-    const serviceAccountPath = process.env.GOOGLE_SERVICE_ACCOUNT_PATH;
-    const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-    
-    let credentials;
-    
-    if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
-      // Load from file
-      credentials = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-    } else if (serviceAccountKey) {
-      // Parse from environment variable (useful for deployment)
-      credentials = typeof serviceAccountKey === 'string' 
-        ? JSON.parse(serviceAccountKey) 
-        : serviceAccountKey;
-    } else {
-      console.log('⚠️ Email service not configured - no Google service account credentials found');
-      return false;
-    }
-
-    // Create JWT client
-    const jwtClient = new google.auth.JWT(
-      credentials.client_email,
-      null,
-      credentials.private_key,
-      ['https://www.googleapis.com/auth/gmail.send'],
-      // The email address to send from (must be authorized for the service account)
-      process.env.SEND_FROM_EMAIL || 'hello@themeatery.com'
-    );
-
-    // Authorize
-    await jwtClient.authorize();
-    
-    // Create OAuth2 client from JWT
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.credentials = jwtClient.credentials;
-
-    // Create transporter
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user: process.env.SEND_FROM_EMAIL || 'hello@themeatery.com',
-        serviceClient: credentials.client_email,
-        privateKey: credentials.private_key,
-        accessToken: jwtClient.credentials.access_token,
-      },
-    });
-
-    console.log('✅ Email service initialized successfully');
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to initialize email service:', error.message);
-    
-    // Fallback to basic SMTP if available
+    // First check for SMTP configuration (simpler and more common)
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
@@ -80,10 +27,99 @@ export async function initializeEmailService() {
           pass: process.env.SMTP_PASS,
         },
       });
-      console.log('✅ Email service initialized with SMTP fallback');
-      return true;
+      
+      // Test the connection
+      try {
+        await transporter.verify();
+        console.log('✅ Email service initialized with SMTP successfully');
+        return true;
+      } catch (error) {
+        console.error('❌ SMTP connection failed:', error.message);
+        console.log('Falling back to Google Service Account...');
+      }
     }
     
+    // Use Google Service Account with domain-wide delegation
+    const serviceAccountEmail = process.env.ANALYTICS_CLIENT_EMAIL || 'meatery-dashboard@theta-voyager-423706-t9.iam.gserviceaccount.com';
+    const privateKey = process.env.ANALYTICS_PRIVATE_KEY;
+    const impersonatedUser = process.env.GMAIL_IMPERSONATED_USER || 'nicholas@themeatery.com';
+    
+    if (!privateKey) {
+      console.log('⚠️ Email service not configured - no SMTP or Google service account credentials found');
+      return false;
+    }
+
+    console.log('Using Google Service Account with domain-wide delegation');
+    console.log('Service Account:', serviceAccountEmail);
+    console.log('Impersonating:', impersonatedUser);
+    
+    // Create JWT client with user impersonation (required for Gmail with domain-wide delegation)
+    const jwtClient = new google.auth.JWT({
+      email: serviceAccountEmail,
+      key: privateKey.replace(/\\n/g, '\n'),
+      scopes: ['https://www.googleapis.com/auth/gmail.send'],
+      subject: impersonatedUser // CRITICAL: Must impersonate a domain user for Gmail
+    });
+
+    // Authorize
+    await jwtClient.authorize();
+    console.log('JWT client authorized successfully');
+    
+    const gmail = google.gmail({ version: 'v1', auth: jwtClient });
+    
+    // Create custom transporter using Gmail API
+    transporter = {
+      sendMail: async (mailOptions) => {
+        // Build the email in RFC 2822 format
+        const messageParts = [
+          `From: "${impersonatedUser.split('@')[0]}" <${impersonatedUser}>`,
+          `To: ${mailOptions.to}`
+        ];
+        
+        if (mailOptions.cc) {
+          messageParts.push(`Cc: ${mailOptions.cc}`);
+        }
+        
+        messageParts.push(
+          `Subject: ${mailOptions.subject}`,
+          'MIME-Version: 1.0',
+          'Content-Type: text/html; charset=utf-8'
+        );
+        
+        // Add custom headers if provided
+        if (mailOptions.headers) {
+          Object.entries(mailOptions.headers).forEach(([key, value]) => {
+            messageParts.push(`${key}: ${value}`);
+          });
+        }
+        
+        messageParts.push('', mailOptions.html || mailOptions.text || '');
+        
+        const message = messageParts.join('\r\n');
+        
+        // Encode for Gmail API
+        const encodedMessage = Buffer.from(message)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+        
+        const result = await gmail.users.messages.send({
+          userId: impersonatedUser,
+          requestBody: {
+            raw: encodedMessage
+          }
+        });
+        
+        console.log('Email sent successfully via Gmail API');
+        return { messageId: result.data.id, ...result.data };
+      }
+    };
+
+    console.log('✅ Email service initialized with Google Service Account successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to initialize email service:', error.message);
     return false;
   }
 }
