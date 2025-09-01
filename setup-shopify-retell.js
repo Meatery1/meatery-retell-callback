@@ -158,9 +158,17 @@ async function addShopifyTools(llm) {
       type: "custom",
       name: "get_order_details",
       description: "Retrieve detailed information about a specific order using order number or customer phone number. Returns order items, delivery status, customer name, and total.",
-      speak_after_execution: false,
-      speak_during_execution: false,
-      url: `${serverUrl}/flow/order-context`
+      speak_after_execution: true,  // CRITICAL: Must be true so agent speaks the results!
+      speak_during_execution: false,  // Don't speak while waiting, speak after
+      url: `${serverUrl}/flow/order-context`,
+      parameters: {
+        type: "object",
+        properties: {
+          order_number: { type: "string", description: "The order number to look up" },
+          phone: { type: "string", description: "Customer phone number" }
+        },
+        required: []
+      }
     },
     {
       type: "custom",
