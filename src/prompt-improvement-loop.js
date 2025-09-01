@@ -13,6 +13,7 @@ import Retell from 'retell-sdk';
 import OpenAI from 'openai';
 import fs from 'fs/promises';
 import path from 'path';
+import { sendDailyImprovementSummary } from './email-service.js';
 
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -532,6 +533,27 @@ async function runImprovementLoop() {
       console.log(`💡 No new calls to analyze since last run`);
       console.log(`   - Calls found: ${analysis.calls_found}`);
       console.log(`   - This suggests the system is working well or there's low call volume`);
+      
+      // Send summary email even when no improvements are needed
+      try {
+        const summaryData = {
+          analysis_date: new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
+          calls_analyzed: analysis.calls_found,
+          success_rate: 'N/A - No new calls',
+          improvements_made: false,
+          new_sections_added: {},
+          priority_fixes: [],
+          expected_improvement: 'None needed - system working well',
+          next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+          status: 'No new calls to analyze - system performing well'
+        };
+        
+        await sendDailyImprovementSummary(summaryData);
+        console.log('✅ Daily summary email sent to nicholas@themeatery.com (no improvements needed)');
+      } catch (emailError) {
+        console.error('⚠️ Failed to send daily summary email:', emailError.message);
+      }
+      
       return { status: 'insufficient_new_data', calls_found: analysis.calls_found };
     }
     
@@ -570,11 +592,53 @@ async function runImprovementLoop() {
     await updateLastAnalysisTimestamp();
     console.log('📅 Analysis timestamp updated - next run will focus on new calls only');
     
-    // Step 5: Schedule next run
+    // Step 5: Send daily summary email to Nicholas
+    console.log('📧 Sending daily improvement summary email...');
+    try {
+      const summaryData = {
+        analysis_date: new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
+        calls_analyzed: analysis.total,
+        success_rate: ((analysis.successful.length / analysis.total) * 100).toFixed(1),
+        improvements_made: true,
+        new_sections_added: improvements.new_sections || {},
+        priority_fixes: improvements.priority_fixes || [],
+        expected_improvement: improvements.expected_improvement || 'Unknown',
+        next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+        status: 'Improvements applied successfully'
+      };
+      
+      await sendDailyImprovementSummary(summaryData);
+      console.log('✅ Daily summary email sent to nicholas@themeatery.com');
+    } catch (emailError) {
+      console.error('⚠️ Failed to send daily summary email:', emailError.message);
+      // Don't fail the improvement loop if email fails
+    }
+    
+    // Step 6: Schedule next run
     console.log('⏰ Next analysis in 24 hours...');
     
   } catch (error) {
     console.error('❌ Error in improvement loop:', error);
+    
+    // Send error summary email if possible
+    try {
+      const errorSummaryData = {
+        analysis_date: new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
+        calls_analyzed: 0,
+        success_rate: 0,
+        improvements_made: false,
+        new_sections_added: {},
+        priority_fixes: [],
+        expected_improvement: 'None - error occurred',
+        next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+        status: `Error: ${error.message}`
+      };
+      
+      await sendDailyImprovementSummary(errorSummaryData);
+      console.log('⚠️ Error summary email sent to nicholas@themeatery.com');
+    } catch (emailError) {
+      console.error('❌ Failed to send error summary email:', emailError.message);
+    }
   }
 }
 
