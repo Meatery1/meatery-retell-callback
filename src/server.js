@@ -619,6 +619,8 @@ app.post("/call/batch", async (req, res) => {
 // --- Discount and SMS endpoints for Retell custom tools ---
 app.post("/tools/send-discount", async (req, res) => {
   try {
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
     const { 
       customer_phone,
       customer_name,
@@ -627,7 +629,7 @@ app.post("/tools/send-discount", async (req, res) => {
       discount_type = 'percentage',
       discount_value = 10,
       reason = 'customer_service'
-    } = req.body;
+    } = params;
 
     if (!customer_phone) {
       return res.status(400).json({ 
@@ -731,8 +733,12 @@ async function handleOrderContext(req, res) {
       url: req.url
     });
     
-    // Try multiple ways to get the order number
-    let orderNumber = params?.order_number || 
+    // RETELL SENDS PARAMETERS IN body.args NOT IN params!
+    // The structure is: body: { call: {...}, name: 'tool_name', args: { order_number: '42507' } }
+    const retellArgs = req.body?.args || {};
+    
+    let orderNumber = retellArgs.order_number ||  // <-- GET IT FROM body.args!
+                      params?.order_number || 
                       params?.orderNumber || 
                       req.params?.order_number;
     
@@ -748,7 +754,7 @@ async function handleOrderContext(req, res) {
       orderNumber = '42507';  // Eric J's order that we know exists
     }
     
-    const phone = params?.phone || params?.customer_phone;
+    const phone = retellArgs.phone || retellArgs.customer_phone || params?.phone || params?.customer_phone;
     
     console.log(`Order context lookup: order=${orderNumber}, phone=${phone}`);
     
@@ -790,7 +796,9 @@ app.post("/flow/order-context", handleOrderContext);
 
 app.post("/flow/capture-feedback", async (req, res) => {
   try {
-    const { order_number, satisfied_score, had_issue, issue_notes, preferred_contact, requested_opt_out } = req.body || {};
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    const { order_number, satisfied_score, had_issue, issue_notes, preferred_contact, requested_opt_out } = params;
     const order = await shopifyGetOrderByNumber(order_number);
     if (!order?.id) return res.status(404).json({ error: "order_not_found" });
     const addTags = [];
@@ -814,7 +822,9 @@ app.post("/flow/capture-feedback", async (req, res) => {
 
 app.post("/flow/request-replacement", async (req, res) => {
   try {
-    const { order_number, item_title, quantity = 1, reason } = req.body || {};
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    const { order_number, item_title, quantity = 1, reason } = params;
     const order = await shopifyGetOrderByNumber(order_number);
     if (!order?.id) return res.status(404).json({ error: "order_not_found" });
     const tag = "replacement-requested";
