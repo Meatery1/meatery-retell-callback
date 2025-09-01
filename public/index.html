@@ -499,15 +499,21 @@
       async function refreshAgents() {
         const select = el('quickAgentSelect');
         select.innerHTML = '<option value="">Loading agents...</option>';
+        const defaultOutboundAgent = 'agent_2f7a3254099b872da193df3133';
+        
         try {
           const agents = await api('/agents');
           availableAgents = agents;
           
-          select.innerHTML = '<option value="">Select an agent (optional)</option>';
+          select.innerHTML = '<option value="">Use Default Outbound Agent</option>';
           agents.forEach(agent => {
             const option = document.createElement('option');
             option.value = agent.agent_id;
             option.textContent = `${agent.agent_name || 'Unnamed Agent'} (${agent.agent_id.substring(0, 12)}...)`;
+            // Pre-select the outbound agent if it matches
+            if (agent.agent_id === defaultOutboundAgent && agent.agent_name.includes('Outbound')) {
+              option.selected = true;
+            }
             select.appendChild(option);
           });
           
@@ -521,7 +527,11 @@
       // Quick call function for team members
       async function quickCall(name, phone) {
         const selectedAgent = el('quickAgentSelect').value;
-        out.textContent = `Calling ${name} at ${phone}...`;
+        // Default to the outbound agent if none selected
+        const defaultOutboundAgent = 'agent_2f7a3254099b872da193df3133';
+        const agentToUse = selectedAgent || defaultOutboundAgent;
+        
+        out.textContent = `Calling ${name} at ${phone} with agent: ${agentToUse.substring(0, 12)}...`;
         
         try {
           const data = await api('/call', { 
@@ -530,7 +540,7 @@
               phone: phone,
               name: name,
               orderNumber: 'TEST-' + Date.now(),
-              agentId: selectedAgent || undefined,
+              agentId: agentToUse,
               metadata: {
                 test_call: true,
                 initiated_by: 'quick_call_button'

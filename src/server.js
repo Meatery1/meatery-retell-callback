@@ -218,6 +218,7 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
     The number must be bound to an outbound agent in Retell dashboard.
   */
   const vars = {
+    call_direction: 'OUTBOUND',  // Critical: Tell agent this is an outbound call
     customer_name: customerName,
     order_number: orderNumber,
     customer_phone: phone,  // Add phone for Shopify tool lookups
