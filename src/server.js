@@ -421,7 +421,15 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
             (structured.send_discount_sms === true);
           
           if (shouldSendDiscount) {
-            const customerPhone = m.customer_phone || structured.customer_phone || event?.data?.phone;
+            // Determine correct customer phone based on call direction
+            let customerPhoneFromCall = null;
+            if (data?.direction === 'outbound') {
+              customerPhoneFromCall = data?.to_number;  // Customer is the recipient
+            } else if (data?.direction === 'inbound') {
+              customerPhoneFromCall = data?.from_number;  // Customer is the caller
+            }
+            
+            const customerPhone = m.customer_phone || structured.customer_phone || customerPhoneFromCall;
             const customerName = m.customer_name || structured.customer_name || "Valued Customer";
             const customerEmail = m.customer_email || structured.customer_email;
             
@@ -826,16 +834,32 @@ async function handleOrderContext(req, res) {
       if (urlMatch) orderNumber = urlMatch[1];
     }
     
-    // Get phone from various sources - including the call itself
+    // Determine the customer's phone number based on call direction
+    // For outbound calls: customer phone is to_number
+    // For inbound calls: customer phone is from_number
+    const direction = callData?.direction || 'unknown';
+    let customerPhoneFromCall = null;
+    
+    if (direction === 'outbound') {
+      // Outbound: we called the customer, so customer is to_number
+      customerPhoneFromCall = callData?.to_number;
+      console.log(`Outbound call detected, using to_number: ${customerPhoneFromCall}`);
+    } else if (direction === 'inbound') {
+      // Inbound: customer called us, so customer is from_number
+      customerPhoneFromCall = callData?.from_number;
+      console.log(`Inbound call detected, using from_number: ${customerPhoneFromCall}`);
+    }
+    
+    // Get phone from various sources - prioritize correct call direction phone
     let phone = retellArgs.phone || 
                 retellArgs.customer_phone || 
                 retellArgs.phone_number ||
                 params?.phone || 
                 params?.customer_phone ||
-                callData?.from_number ||  // For inbound calls, this is the customer's number
+                customerPhoneFromCall ||  // Use the correctly determined phone from call
                 callData?.metadata?.customer_phone;
     
-    console.log(`Order context lookup: order=${orderNumber}, phone=${phone}, from_number=${callData?.from_number}`);
+    console.log(`Order context lookup: order=${orderNumber}, phone=${phone}, direction=${direction}`);
     
     let order = null;
     let lookupMethod = '';
@@ -853,15 +877,8 @@ async function handleOrderContext(req, res) {
       if (order) lookupMethod = 'phone';
     }
     
-    // If still no order and this is an inbound call, try the from_number
-    if (!order && callData?.from_number) {
-      console.log(`Trying from_number lookup: ${callData.from_number}`);
-      order = await findLatestOrderForPhone(callData.from_number);
-      if (order) lookupMethod = 'from_number';
-    }
-    
     if (!order) {
-      console.log(`Order not found: order=${orderNumber}, phone=${phone}, from_number=${callData?.from_number}`);
+      console.log(`Order not found: order=${orderNumber}, phone=${phone}, direction=${direction}`);
       return res.json({ 
         speak: "I'm having trouble finding your order. Can you provide your order number? It should be a 5-digit number.",
         error: "order_not_found",
@@ -883,7 +900,7 @@ async function handleOrderContext(req, res) {
     
     // Build response with context about how we found it
     let speakPrefix = '';
-    if (lookupMethod === 'phone' || lookupMethod === 'from_number') {
+    if (lookupMethod === 'phone') {
       speakPrefix = `I found your most recent order, number ${order.order_number}. `;
     } else {
       speakPrefix = '';
