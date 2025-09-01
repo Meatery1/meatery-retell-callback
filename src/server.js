@@ -805,6 +805,9 @@ async function handleOrderContext(req, res) {
     // The structure is: body: { call: {...}, name: 'tool_name', args: { order_number: '42507' } }
     const retellArgs = req.body?.args || {};
     
+    // Try to get the call object for phone context
+    const callData = req.body?.call || {};
+    
     let orderNumber = retellArgs.order_number ||  // <-- GET IT FROM body.args!
                       params?.order_number || 
                       params?.orderNumber || 
@@ -816,23 +819,51 @@ async function handleOrderContext(req, res) {
       if (urlMatch) orderNumber = urlMatch[1];
     }
     
-    // Fallback to a known order for testing
-    if (!orderNumber) {
-      console.log('WARNING: No order number provided, using fallback 42507');
-      orderNumber = '42507';  // Eric J's order that we know exists
-    }
+    // Get phone from various sources - including the call itself
+    let phone = retellArgs.phone || 
+                retellArgs.customer_phone || 
+                retellArgs.phone_number ||
+                params?.phone || 
+                params?.customer_phone ||
+                callData?.from_number ||  // For inbound calls, this is the customer's number
+                callData?.metadata?.customer_phone;
     
-    const phone = retellArgs.phone || retellArgs.customer_phone || params?.phone || params?.customer_phone;
-    
-    console.log(`Order context lookup: order=${orderNumber}, phone=${phone}`);
+    console.log(`Order context lookup: order=${orderNumber}, phone=${phone}, from_number=${callData?.from_number}`);
     
     let order = null;
-    if (orderNumber) order = await shopifyGetOrderByNumber(orderNumber);
-    if (!order && phone) order = await findLatestOrderForPhone(phone);
-    if (!order) {
-      console.log(`Order not found: ${orderNumber || phone}`);
-      return res.status(404).json({ error: "order_not_found", message: "Could not find that order" });
+    let lookupMethod = '';
+    
+    // First try order number if provided
+    if (orderNumber) {
+      order = await shopifyGetOrderByNumber(orderNumber);
+      if (order) lookupMethod = 'order_number';
     }
+    
+    // If no order found and we have a phone, try phone lookup
+    if (!order && phone) {
+      console.log(`No order found by number, trying phone lookup: ${phone}`);
+      order = await findLatestOrderForPhone(phone);
+      if (order) lookupMethod = 'phone';
+    }
+    
+    // If still no order and this is an inbound call, try the from_number
+    if (!order && callData?.from_number) {
+      console.log(`Trying from_number lookup: ${callData.from_number}`);
+      order = await findLatestOrderForPhone(callData.from_number);
+      if (order) lookupMethod = 'from_number';
+    }
+    
+    if (!order) {
+      console.log(`Order not found: order=${orderNumber}, phone=${phone}, from_number=${callData?.from_number}`);
+      return res.json({ 
+        speak: "I'm having trouble finding your order. Can you provide your order number? It should be a 5-digit number.",
+        error: "order_not_found",
+        message: "Could not find order. Please provide order number."
+      });
+    }
+    
+    console.log(`Order found via ${lookupMethod}: #${order.order_number} for ${order.customer?.first_name || 'customer'}`);
+    
     
     const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
     
@@ -842,6 +873,14 @@ async function handleOrderContext(req, res) {
     
     const primaryItem = lineItems[0]?.title || null;
     const deliveredAt = (order.fulfillments || []).find(f => (f?.shipment_status || "") === "delivered")?.updated_at || null;
+    
+    // Build response with context about how we found it
+    let speakPrefix = '';
+    if (lookupMethod === 'phone' || lookupMethod === 'from_number') {
+      speakPrefix = `I found your most recent order, number ${order.order_number}. `;
+    } else {
+      speakPrefix = '';
+    }
     
     const response = {
       ok: true,
@@ -853,10 +892,11 @@ async function handleOrderContext(req, res) {
       items_display: itemsSummary,     // Keep original format for display
       primary_item: primaryItem,
       delivered_at: deliveredAt,
-      speak: `Your order contains ${itemsForSpeech}`  // Use conversational format
+      lookup_method: lookupMethod,     // How we found the order
+      speak: speakPrefix + `Your order contains ${itemsForSpeech}`  // Use conversational format
     };
     
-    console.log(`Order found: ${order.name} - ${itemsSummary}`);
+    console.log(`Order found: ${order.name} - ${itemsSummary} (via ${lookupMethod})`);
     res.json(response);
   } catch (e) {
     console.error('Order context error:', e.message);
