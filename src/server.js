@@ -18,6 +18,9 @@ import {
   sendSupportTicket
 } from './email-service.js';
 
+// Import the improvement system
+import { runImprovementLoop } from './prompt-improvement-loop.js';
+
 dotenv.config();
 
 const app = express();
@@ -1274,6 +1277,56 @@ app.get("/calls/summary", (_req, res) => {
   }
 });
 
+// 🚀 IMPROVEMENT SYSTEM ENDPOINTS
+app.get("/improve-agent/status", (req, res) => {
+  try {
+    const now = new Date();
+    const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const nextRun = new Date(pst);
+    nextRun.setHours(2, 0, 0, 0);
+    
+    // If it's already past 2 AM today, next run is tomorrow
+    if (pst.getHours() >= 2) {
+      nextRun.setDate(nextRun.getDate() + 1);
+    }
+    
+    const timeUntilNext = nextRun.getTime() - pst.getTime();
+    
+    res.json({
+      scheduler_active: true,
+      next_run: nextRun.toISOString(),
+      next_run_pst: nextRun.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
+      time_until_next: {
+        hours: Math.floor(timeUntilNext / (1000 * 60 * 60)),
+        minutes: Math.floor((timeUntilNext % (1000 * 60 * 60)) / (1000 * 60))
+      },
+      current_time_pst: pst.toISOString(),
+      schedule: "Daily at 2:00 AM PST"
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/improve-agent", async (req, res) => {
+  try {
+    console.log('🔄 Manual improvement trigger requested');
+    const result = await runImprovementLoop();
+    res.json({ 
+      ok: true, 
+      message: 'Improvement loop completed',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error in manual improvement:', error);
+    res.status(500).json({ 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Return the most recent webhook events from our JSONL log
 app.get("/calls/recent-log", (req, res) => {
   try {
@@ -1292,4 +1345,55 @@ app.get("/calls/recent-log", (req, res) => {
 });
 
 const port = process.env.PORT || 8080;
-app.listen(port, () => console.log(`Meatery Retell server listening on :${port}`));
+
+// 🚀 AUTOMATED IMPROVEMENT SYSTEM
+// Runs daily at 2 AM PST to analyze calls and optimize the agent
+function startImprovementScheduler() {
+  console.log('📅 Starting automated improvement scheduler...');
+  
+  // Calculate time until next 2 AM PST
+  const now = new Date();
+  const pst = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const nextRun = new Date(pst);
+  nextRun.setHours(2, 0, 0, 0);
+  
+  // If it's already past 2 AM today, schedule for tomorrow
+  if (pst.getHours() >= 2) {
+    nextRun.setDate(nextRun.getDate() + 1);
+  }
+  
+  const timeUntilNext = nextRun.getTime() - pst.getTime();
+  
+  console.log(`⏰ Next improvement run: ${nextRun.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}`);
+  console.log(`   (in ${Math.round(timeUntilNext / (1000 * 60 * 60))} hours and ${Math.round((timeUntilNext % (1000 * 60 * 60)) / (1000 * 60))} minutes)`);
+  
+  // Schedule the first run
+  setTimeout(async () => {
+    console.log('🔄 Running scheduled improvement loop...');
+    try {
+      await runImprovementLoop();
+      console.log('✅ Scheduled improvement completed successfully');
+    } catch (error) {
+      console.error('❌ Error in scheduled improvement:', error);
+    }
+    
+    // Then schedule to run every 24 hours
+    setInterval(async () => {
+      console.log('🔄 Running scheduled improvement loop...');
+      try {
+        await runImprovementLoop();
+        console.log('✅ Scheduled improvement completed successfully');
+      } catch (error) {
+        console.error('❌ Error in scheduled improvement:', error);
+      }
+    }, 24 * 60 * 60 * 1000); // 24 hours in milliseconds
+    
+  }, timeUntilNext);
+}
+
+app.listen(port, () => {
+  console.log(`Meatery Retell server listening on :${port}`);
+  
+  // Start the improvement scheduler
+  startImprovementScheduler();
+});
