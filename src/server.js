@@ -11,6 +11,12 @@ import {
   createAndSendDiscount, 
   checkDiscountEligibility 
 } from './discount-sms-service.js';
+import {
+  initializeEmailService,
+  sendRefundTicket,
+  sendReplacementTicket,
+  sendSupportTicket
+} from './email-service.js';
 
 dotenv.config();
 
@@ -938,13 +944,140 @@ app.post("/flow/request-replacement", async (req, res) => {
   try {
     // Retell sends params in body.args
     const params = req.body?.args || req.body || {};
-    const { order_number, item_title, quantity = 1, reason } = params;
+    const { order_number, item_title, quantity = 1, reason, issue_type } = params;
     const order = await shopifyGetOrderByNumber(order_number);
     if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    
+    // Extract customer information - MUST get email for CC requirement
+    const customerName = [order?.customer?.first_name, order?.customer?.last_name].filter(Boolean).join(" ") || "Valued Customer";
+    const customerEmail = order?.customer?.email || order?.email || order?.contact_email || order?.billing_address?.email;
+    const customerPhone = order?.phone || order?.shipping_address?.phone || order?.customer?.phone || order?.billing_address?.phone;
+    
+    // Log warning if no email found
+    if (!customerEmail) {
+      console.error(`❌ CRITICAL: No customer email found for order #${order_number} - Customer CANNOT be CC'd on ticket`);
+    }
+    
+    // Send email ticket to Commslayer
+    try {
+      await sendReplacementTicket({
+        orderNumber: order_number,
+        customerName,
+        customerEmail,
+        customerPhone,
+        itemTitle: item_title || "(unspecified)",
+        quantity,
+        reason,
+        issueType: issue_type
+      });
+      console.log(`✅ Replacement ticket emailed for order #${order_number}`);
+    } catch (emailError) {
+      console.error(`⚠️ Failed to send replacement email ticket:`, emailError.message);
+      // Continue even if email fails - we'll still update Shopify
+    }
+    
+    // Also update Shopify with tags and notes
     const tag = "replacement-requested";
-    const note = `Replacement requested: ${quantity}x ${item_title || "(unspecified)"}${reason ? ` | Reason: ${reason}` : ""}`;
+    const note = `Replacement requested: ${quantity}x ${item_title || "(unspecified)"}${reason ? ` | Reason: ${reason}` : ""} | Ticket filed with support team`;
     await shopifyAppendNoteAndTags({ orderId: order.id, noteAppend: note, addTags: [tag] });
-    res.json({ ok: true });
+    
+    res.json({ 
+      ok: true,
+      speak: customerEmail 
+        ? "I've filed a priority ticket with our support team for your replacement. You'll receive a copy of this ticket at your email, and they'll contact you within 24 hours with shipping details."
+        : "I've filed a priority ticket with our support team for your replacement. To ensure you receive updates, can you please provide your email address?",
+      ticket_filed: true,
+      customer_email_found: !!customerEmail,
+      needs_email: !customerEmail
+    });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// Endpoint to update customer email if collected during call
+app.post("/flow/update-customer-email", async (req, res) => {
+  try {
+    const params = req.body?.args || req.body || {};
+    const { order_number, customer_email } = params;
+    
+    if (!customer_email || !customer_email.includes('@')) {
+      return res.status(400).json({ 
+        error: "Invalid email address",
+        speak: "I didn't catch that email correctly. Could you repeat it please?"
+      });
+    }
+    
+    const order = await shopifyGetOrderByNumber(order_number);
+    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    
+    // Update Shopify order note with the email
+    const note = `Customer email provided during call: ${customer_email}`;
+    await shopifyAppendNoteAndTags({ orderId: order.id, noteAppend: note, addTags: ["email-collected"] });
+    
+    console.log(`✅ Customer email collected for order #${order_number}: ${customer_email}`);
+    
+    res.json({ 
+      ok: true,
+      speak: "Perfect, I've got your email. You'll receive a confirmation of this ticket shortly.",
+      email_collected: true,
+      customer_email: customer_email
+    });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// New endpoint for refund requests
+app.post("/flow/request-refund", async (req, res) => {
+  try {
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    const { order_number, items, reason, preferred_resolution = 'refund' } = params;
+    const order = await shopifyGetOrderByNumber(order_number);
+    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    
+    // Extract customer information - MUST get email for CC requirement
+    const customerName = [order?.customer?.first_name, order?.customer?.last_name].filter(Boolean).join(" ") || "Valued Customer";
+    const customerEmail = order?.customer?.email || order?.email || order?.contact_email || order?.billing_address?.email;
+    const customerPhone = order?.phone || order?.shipping_address?.phone || order?.customer?.phone || order?.billing_address?.phone;
+    
+    // Log warning if no email found
+    if (!customerEmail) {
+      console.error(`❌ CRITICAL: No customer email found for order #${order_number} - Customer CANNOT be CC'd on ticket`);
+    }
+    
+    // Send email ticket to Commslayer
+    try {
+      await sendRefundTicket({
+        orderNumber: order_number,
+        customerName,
+        customerEmail,
+        customerPhone,
+        items: items || "All items in order",
+        reason,
+        preferredResolution: preferred_resolution
+      });
+      console.log(`✅ Refund ticket emailed for order #${order_number}`);
+    } catch (emailError) {
+      console.error(`⚠️ Failed to send refund email ticket:`, emailError.message);
+      // Continue even if email fails - we'll still update Shopify
+    }
+    
+    // Also update Shopify with tags and notes
+    const tag = "refund-requested";
+    const note = `Refund requested: ${items || "All items"}${reason ? ` | Reason: ${reason}` : ""} | Ticket filed with support team`;
+    await shopifyAppendNoteAndTags({ orderId: order.id, noteAppend: note, addTags: [tag] });
+    
+    res.json({ 
+      ok: true,
+      speak: customerEmail 
+        ? "I've filed a priority ticket with our support team for your refund. You'll receive a copy of this ticket at your email, and they'll process this within 24 hours."
+        : "I've filed a priority ticket with our support team for your refund. To ensure you receive updates, can you please provide your email address?",
+      ticket_filed: true,
+      customer_email_found: !!customerEmail,
+      needs_email: !customerEmail
+    });
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
   }
