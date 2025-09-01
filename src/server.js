@@ -97,6 +97,7 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
     const lineItems = Array.isArray(o.line_items) ? o.line_items : [];
     const primaryItem = lineItems[0]?.title || null;
     const itemsSummary = lineItems.slice(0, 5).map(li => `${li.quantity}x ${li.title}`).join(", ");
+    const itemsForSpeech = lineItems.slice(0, 5).map(li => formatProductForSpeech(li.quantity, li.title)).join(", ");
     const deliveredAt = (o.fulfillments || []).find(f => (f?.shipment_status || "") === "delivered")?.updated_at || null;
     return [{
       order_id: o.id,
@@ -107,7 +108,8 @@ async function fetchRecentDeliveredOrders({ hours = 48 } = {}) {
       created_at: o.created_at,
       tags: (o.tags || ""),
       primary_item: primaryItem,
-      items_summary: itemsSummary,
+      items_summary: itemsForSpeech,  // Use conversational format for speech
+      items_display: itemsSummary,     // Keep original format for display
       delivered_at: deliveredAt
     }];
   });
@@ -717,6 +719,39 @@ app.post("/tools/check-discount-eligibility", async (req, res) => {
   }
 });
 
+// --- Helper function to format product titles conversationally ---
+function formatProductForSpeech(quantity, title) {
+  // Convert quantity to words for small numbers
+  const numberWords = {
+    1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five',
+    6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten'
+  };
+  
+  const qtyWord = numberWords[quantity] || quantity;
+  
+  // Clean up the product title for natural speech
+  let cleanTitle = title
+    .replace(/\|/g, '') // Remove pipe symbols
+    .replace(/\s+/g, ' ') // Normalize spaces
+    .replace(/(\d+)-(\d+)oz/gi, '$1 to $2 ounces') // "8-9oz" -> "8 to 9 ounces"
+    .replace(/(\d+)oz/gi, '$1 ounces') // "8oz" -> "8 ounces"
+    .replace(/MS (\d+)\+?/gi, 'marbling score $1') // "MS 9+" -> "marbling score 9"
+    .replace(/BMS (\d+)/gi, 'marbling score $1') // "BMS 11" -> "marbling score 11"
+    .replace(/A5/g, 'A-five') // "A5" -> "A-five"
+    .trim();
+  
+  // Handle pluralization
+  if (quantity === 1) {
+    return `${qtyWord} ${cleanTitle}`;
+  } else {
+    // Simple pluralization for common meat terms
+    if (cleanTitle.match(/steak|chop|roast|ribeye|strip|filet/i) && !cleanTitle.match(/steaks|chops|roasts|ribeyes|strips|filets/i)) {
+      cleanTitle = cleanTitle.replace(/(steak|chop|roast|ribeye|strip|filet)/gi, '$1s');
+    }
+    return `${qtyWord} ${cleanTitle}`;
+  }
+}
+
 // --- Flow function endpoints for Conversation Flow nodes ---
 // Support both GET and POST for Retell custom tools
 async function handleOrderContext(req, res) {
@@ -767,7 +802,11 @@ async function handleOrderContext(req, res) {
     }
     
     const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
+    
+    // Create both display and speech versions
     const itemsSummary = lineItems.slice(0, 5).map(li => `${li.quantity}x ${li.title}`).join(", ");
+    const itemsForSpeech = lineItems.slice(0, 5).map(li => formatProductForSpeech(li.quantity, li.title)).join(", ");
+    
     const primaryItem = lineItems[0]?.title || null;
     const deliveredAt = (order.fulfillments || []).find(f => (f?.shipment_status || "") === "delivered")?.updated_at || null;
     
@@ -777,10 +816,11 @@ async function handleOrderContext(req, res) {
       order_number: order.order_number,
       customer_name: [order?.customer?.first_name, order?.customer?.last_name].filter(Boolean).join(" ") || "there",
       customer_phone: order?.phone || order?.shipping_address?.phone || order?.customer?.phone || null,
-      items_summary: itemsSummary,
+      items_summary: itemsForSpeech,  // Use conversational format for speech
+      items_display: itemsSummary,     // Keep original format for display
       primary_item: primaryItem,
       delivered_at: deliveredAt,
-      speak: `Your order contains ${itemsSummary}`  // Add speech response for Retell
+      speak: `Your order contains ${itemsForSpeech}`  // Use conversational format
     };
     
     console.log(`Order found: ${order.name} - ${itemsSummary}`);
