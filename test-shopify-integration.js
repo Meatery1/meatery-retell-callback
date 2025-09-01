@@ -13,7 +13,7 @@ dotenv.config();
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 
 // Use the correct agent and LLM IDs
-const AGENT_ID = 'agent_2f7a3254099b872da193df3133';  // Meatery Mike - Confident Male
+const AGENT_ID = 'agent_2f7a3254099b872da193df3133';  // Meatery Nick - Confident Male
 const LLM_ID = 'llm_7eed186989d2fba11fa1f9395bc7';
 
 async function testIntegration() {

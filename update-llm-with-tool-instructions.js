@@ -44,7 +44,7 @@ CRITICAL: When asked about order contents, ALWAYS use get_order_details instead 
   });
   
   console.log('✅ Prompt updated with tool instructions!');
-  console.log('\nMike will now:');
+  console.log('\nNick will now:');
   console.log('  • Use tools when customers ask about orders');
   console.log('  • Say "Let me look that up" while tools execute');
   console.log('  • Actually retrieve order contents from Shopify');

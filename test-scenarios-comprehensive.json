@@ -103,11 +103,11 @@
     {
       "id": "voicemail_1",
       "category": "voicemail",
-      "customer_name": "Mike",
+      "customer_name": "TestMike",
       "order_number": "67890",
       "scenario": "Voicemail system",
       "customer_responses": [
-        "Hi, you've reached Mike. I can't take your call right now, please leave a message after the beep. BEEP"
+        "Hi, you've reached TestMike. I can't take your call right now, please leave a message after the beep. BEEP"
       ],
       "expected_outcomes": {
         "voicemail_detected": true,
@@ -326,15 +326,15 @@
     {
       "id": "business_customer_1",
       "category": "b2b",
-      "customer_name": "Restaurant_Mike",
+      "customer_name": "Restaurant_Owner",
       "order_number": "88888",
       "scenario": "Restaurant bulk order",
       "customer_responses": [
-        "Yeah, this is Mike from Giovanni's Restaurant",
+        "Yeah, this is the owner from Giovanni's Restaurant",
         "Most of it's good but we're missing 10 pounds of the ribeye.",
         "We need it for tonight's service. Can you expedite?",
         "If not, we need a refund immediately to source elsewhere.",
-        "Okay, email me at mike@giovannis.com"
+        "Okay, email me at owner@giovannis.com"
       ],
       "expected_outcomes": {
         "urgency_recognized": true,
@@ -613,7 +613,7 @@
     {
       "id": "medical_dietary_1",
       "category": "health_concern",
-      "customer_name": "Medical Mike",
+      "customer_name": "Medical Customer",
       "order_number": "10014",
       "scenario": "Medical dietary restriction",
       "customer_responses": [

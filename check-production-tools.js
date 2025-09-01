@@ -50,7 +50,7 @@ async function checkTools() {
   
   if (tools.length > 0) {
     console.log('\n✅ PRODUCTION STATUS: Tools are LIVE!');
-    console.log('   Mike can now:');
+    console.log('   Nick can now:');
     console.log('   • Look up order details');
     console.log('   • Check customer history');
     console.log('   • Send discount codes');

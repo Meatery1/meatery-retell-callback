@@ -14,7 +14,7 @@ The agent was saying "How can I help you?" on outbound calls instead of checking
 ```
 OUTBOUND CALLS:
 - Wait for customer to say hello
-- Then say: "Hey {{customer_name}}, it's Mike from The Meatery. Just checking on your order {{order_number}} - everything arrive cold and sealed up okay?"
+- Then say: "Hey {{customer_name}}, it's Nick from The Meatery. Just checking on your order {{order_number}} - everything arrive cold and sealed up okay?"
 - NEVER ask "How can I help you?" on outbound calls
 ```
 
@@ -81,6 +81,6 @@ node analyze-single-call.js call_554e3de58767bee79e9f3c1f946
 4. **Metadata matters**: Tools need metadata to look up orders
 
 ## Agent IDs
-- **Agent**: `agent_2f7a3254099b872da193df3133` (Meatery Mike - Outbound)
+- **Agent**: `agent_2f7a3254099b872da193df3133` (Meatery Nick - Outbound)
 - **LLM**: `llm_7eed186989d2fba11fa1f9395bc7` (v8 with fixes)
 - **Phone**: `+16198212984` (Retell number)

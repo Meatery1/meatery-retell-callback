@@ -36,7 +36,7 @@ async function updateAgentWithCustomVoice() {
       voice_speed: 1.0,        // Speed of speech (0.5 = slower, 2.0 = faster)
       
       // Optional: Update the agent name to reflect the custom voice
-      agent_name: 'Meatery Mike - Custom Voice'
+      agent_name: 'Meatery Nick - Custom Voice'
     });
     
     console.log('✅ Agent updated successfully!\n');

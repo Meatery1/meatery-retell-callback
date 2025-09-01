@@ -102,7 +102,7 @@ While setting up the custom voice, you're using:
 - **Model**: `eleven_turbo_v2_5`
 - **Settings**: Temperature 0.5, Speed 1.08
 
-These settings are working well for your "Mike from The Meatery" persona.
+These settings are working well for your "Nick from The Meatery" persona.
 
 ## 📧 Support Contacts
 

@@ -19,7 +19,7 @@ async function updateCorrectAgent() {
   console.log('🔄 Updating the CORRECT Agent with All Improvements');
   console.log('===================================================\n');
   
-  console.log(`Target Agent: ${CORRECT_AGENT_ID} (Meatery Mike - Confident Male)`);
+  console.log(`Target Agent: ${CORRECT_AGENT_ID} (Meatery Nick - Confident Male)`);
   console.log(`Target LLM: ${CORRECT_LLM_ID}\n`);
   
   try {
@@ -80,7 +80,7 @@ async function updateCorrectAgent() {
     console.log('✅ Updated .env file with correct Agent and LLM IDs\n');
     
     console.log('🎯 Summary:');
-    console.log('  - Meatery Mike (Confident Male) agent now has:');
+    console.log('  - Meatery Nick (Confident Male) agent now has:');
     console.log('    • Thawed vs Spoiled differentiation');
     console.log('    • Test-based improvements (72.8% expected success)');
     console.log('    • Better edge case handling');

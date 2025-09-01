@@ -49,9 +49,9 @@ async function placeOutboundCall(phoneNumber, customerName = null, orderNumber =
     console.log(`Status: ${call.call_status}\n`);
     
     console.log('🎯 Expected behavior:');
-    console.log('1. Mike waits for customer to say hello');
-    console.log(`2. Mike says: "Hey ${name}, it's Mike from The Meatery..."`);
-    console.log('3. Mike checks on order and can look up details if asked\n');
+    console.log('1. Nick waits for customer to say hello');
+    console.log(`2. Nick says: "Hey ${name}, it's Nick from The Meatery..."`);
+    console.log('3. Nick checks on order and can look up details if asked\n');
     
     console.log('💡 To monitor this call:');
     console.log(`node analyze-single-call.js ${call.call_id}`);

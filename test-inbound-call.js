@@ -17,9 +17,9 @@ async function testInboundCall() {
   
   console.log('🎯 What to Test:\n');
   console.log('1. Call (619) 821-2984 from any phone');
-  console.log('2. Mike should answer: "Hey, this is Mike from The Meatery. Are you calling back about your recent order?"');
+  console.log('2. Nick should answer: "Hey, this is Nick from The Meatery. Are you calling back about your recent order?"');
   console.log('3. Say "Yes, I missed your call"');
-  console.log('4. Mike asks for your name and order number');
+  console.log('4. Nick asks for your name and order number');
   console.log('5. Give him any order number (like 42507)');
   console.log('6. He should look it up and help you\n');
   
@@ -53,22 +53,22 @@ async function testInboundCall() {
     
     console.log('Scenario 1: Missed Call Callback');
     console.log('  You: "Hi, I got a missed call from this number"');
-    console.log('  Mike: Should ask about your recent order\n');
+    console.log('  Nick: Should ask about your recent order\n');
     
     console.log('Scenario 2: Order Question');
     console.log('  You: "I have a question about my order"');
-    console.log('  Mike: Should ask for order details to look it up\n');
+    console.log('  Nick: Should ask for order details to look it up\n');
     
     console.log('Scenario 3: General Inquiry');
     console.log('  You: "Do you guys sell wagyu?"');
-    console.log('  Mike: Should answer and offer to help with ordering\n');
+    console.log('  Nick: Should answer and offer to help with ordering\n');
     
     console.log('Scenario 4: Cooking Help');
     console.log('  You: "I need help cooking a ribeye I bought"');
-    console.log('  Mike: Should provide cooking tips\n');
+    console.log('  Nick: Should provide cooking tips\n');
     
     console.log('💡 Key Differences from Outbound:');
-    console.log('  • Mike won\'t know your name initially');
+    console.log('  • Nick won\'t know your name initially');
     console.log('  • He\'ll need to ask for your order number');
     console.log('  • More discovery-oriented conversation');
     console.log('  • Can handle general inquiries too\n');
@@ -87,7 +87,7 @@ testInboundCall()
     console.log('📞 Phone Number Configuration:');
     console.log('  Number: (619) 821-2984');
     console.log('  Status: ✅ Ready for inbound calls');
-    console.log('  Agent: Mike from The Meatery');
+    console.log('  Agent: Nick from The Meatery');
     console.log('  Features: Order lookup, cooking tips, discount codes\n');
     
     console.log('🎯 The phone number is now fully configured for:');

@@ -119,7 +119,7 @@ To compare your custom voice with the original:
 ## Integration with Your Current Setup
 
 Your current agents using this custom voice:
-- **Outbound Agent**: `agent_2f7a3254099b872da193df3133` (Meatery Mike)
+- **Outbound Agent**: `agent_2f7a3254099b872da193df3133` (Meatery Nick)
 - **Current Voice**: `11labs-Brian` → Will be updated to your custom voice
 
 The custom voice will be used in:
@@ -133,7 +133,7 @@ The custom voice will be used in:
 ### In Your Agent Prompt
 You can reference voice characteristics in your prompt:
 ```
-You are Mike, speaking in a [describe your cloned voice style - e.g., warm, professional, friendly] tone.
+You are Nick, speaking in a [describe your cloned voice style - e.g., warm, professional, friendly] tone.
 ```
 
 ### Dynamic Adjustments

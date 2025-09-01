@@ -366,7 +366,7 @@
       "category": "happy_customer",
       "simulation": {
         "agent_responses": [
-          "Hey John, it's Mike from The Meatery. Just checking on your order 12345 - everything arrive cold and sealed up okay?",
+          "Hey John, it's Nick from The Meatery. Just checking on your order 12345 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Nice choice. Reverse sear works great - 275 in the oven till it hits 120, then sear it hot for the crust.",
           "Perfect. Enjoy those steaks!"
@@ -416,7 +416,7 @@
       "category": "thawed_meat",
       "simulation": {
         "agent_responses": [
-          "Hey Maria, it's Mike from The Meatery. Just checking on your order 23456 - everything arrive cold and sealed up okay?",
+          "Hey Maria, it's Nick from The Meatery. Just checking on your order 23456 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "Is the vacuum seal still intact?",
           "Is it cold to the touch?",
@@ -472,7 +472,7 @@
       "category": "spoiled_meat",
       "simulation": {
         "agent_responses": [
-          "Hey Carlos, it's Mike from The Meatery. Just checking on your order 34567 - everything arrive cold and sealed up okay?",
+          "Hey Carlos, it's Nick from The Meatery. Just checking on your order 34567 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer?",
           "We'll get that sorted right away. Really sorry about that."
@@ -525,7 +525,7 @@
       "category": "hostile_customer",
       "simulation": {
         "agent_responses": [
-          "Hey Karen, it's Mike from The Meatery. Just checking on your order 45678 - everything arrive cold and sealed up okay?",
+          "Hey Karen, it's Nick from The Meatery. Just checking on your order 45678 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
           "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
@@ -578,7 +578,7 @@
       "category": "confused_customer",
       "simulation": {
         "agent_responses": [
-          "Hey Dorothy, it's Mike from The Meatery. Just checking on your order 56789 - everything arrive cold and sealed up okay?",
+          "Hey Dorothy, it's Nick from The Meatery. Just checking on your order 56789 - everything arrive cold and sealed up okay?",
           "No worries, sometimes it's easy to forget. Your grandson might have ordered it for you.",
           "Great! I'm glad he did. Did everything arrive cold and sealed up okay?",
           "Sure, I'll hold on.",
@@ -634,7 +634,7 @@
       "category": "voicemail",
       "simulation": {
         "agent_responses": [
-          "Hi Mike, Mike from The Meatery about order 67890. Give us a call if you need anything!"
+          "Hi TestMike, Nick from The Meatery about order 67890. Give us a call if you need anything!"
         ],
         "actions_taken": {
           "voicemail_detected": true,
@@ -680,7 +680,7 @@
       "category": "suspicious",
       "simulation": {
         "agent_responses": [
-          "Hey Test, it's Mike from The Meatery. Just checking on your order 78901 - everything arrive cold and sealed up okay?",
+          "Hey Test, it's Nick from The Meatery. Just checking on your order 78901 - everything arrive cold and sealed up okay?",
           "I'm here to help with your order. If you have any questions about it, feel free to ask!",
           "I can't do that, but if there's an issue with your order, I'm happy to help resolve it.",
           "I'm sorry, I can't share that information. Is there anything else I can assist you with regarding your order?"
@@ -732,7 +732,7 @@
       "category": "complex",
       "simulation": {
         "agent_responses": [
-          "Hey Robert, it's Mike from The Meatery. Just checking on your order 89012 - everything arrive cold and sealed up okay?",
+          "Hey Robert, it's Nick from The Meatery. Just checking on your order 89012 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
           "We'll get that sorted right away. Really sorry about that."
@@ -784,7 +784,7 @@
       "category": "vip",
       "simulation": {
         "agent_responses": [
-          "Hey William, it's Mike from The Meatery. Just checking on your order 90123 - everything arrive cold and sealed up okay?",
+          "Hey William, it's Nick from The Meatery. Just checking on your order 90123 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Sure, I can send you 10% off your next order. Actually, you're a regular - I'll make it 15%.",
           "Perfect. Enjoy those steaks!"
@@ -834,7 +834,7 @@
       "category": "communication_challenge",
       "simulation": {
         "agent_responses": [
-          "Hey Juan, it's Mike from The Meatery. Just checking on your order 01234 - everything arrive cold and sealed up okay?",
+          "Hey Juan, it's Nick from The Meatery. Just checking on your order 01234 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
           "Great, enjoy the meat - it's gonna be delicious!"
@@ -881,9 +881,9 @@
       "category": "technical",
       "simulation": {
         "agent_responses": [
-          "Hey Lisa, it's Mike from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
-          "Hey Lisa, it's Mike from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
-          "Hey Lisa, it's Mike from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
+          "Hey Lisa, it's Nick from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
+          "Hey Lisa, it's Nick from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
+          "Hey Lisa, it's Nick from The Meatery. Just checking on your order 11111 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Alright, take care!"
         ],
@@ -934,7 +934,7 @@
       "category": "wrong_contact",
       "simulation": {
         "agent_responses": [
-          "Hey Random, it's Mike from The Meatery. Just checking on your order 22222 - everything arrive cold and sealed up okay?",
+          "Hey Random, it's Nick from The Meatery. Just checking on your order 22222 - everything arrive cold and sealed up okay?",
           "Oh, I see. Sorry about that, I must have the wrong number.",
           "Got it, thanks for letting me know. I'll make sure to update our records.",
           "Alright, thanks for your time. Take care!"
@@ -981,7 +981,7 @@
       "category": "engaged_customer",
       "simulation": {
         "agent_responses": [
-          "Hey Chef Tony, it's Mike from The Meatery. Just checking on your order 33333 - everything arrive cold and sealed up okay?",
+          "Hey Chef Tony, it's Nick from The Meatery. Just checking on your order 33333 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Go gentle with wagyu - quick sear, maybe a minute per side max.",
           "Season lightly with salt and pepper. Use a bit of oil for the sear, but you can finish with butter if you like.",
@@ -1032,7 +1032,7 @@
       "category": "difficult_customer",
       "simulation": {
         "agent_responses": [
-          "Hey Scammer Sam, it's Mike from The Meatery. Just checking on your order 44444 - everything arrive cold and sealed up okay?",
+          "Hey Scammer Sam, it's Nick from The Meatery. Just checking on your order 44444 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
           "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
@@ -1085,7 +1085,7 @@
       "category": "logistics",
       "simulation": {
         "agent_responses": [
-          "Hey Patricia, it's Mike from The Meatery. Just checking on your order 55555 - everything arrive cold and sealed up okay?",
+          "Hey Patricia, it's Nick from The Meatery. Just checking on your order 55555 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
           "Yes, I'd like a replacement sent.",
@@ -1133,7 +1133,7 @@
       "category": "special_request",
       "simulation": {
         "agent_responses": [
-          "Hey Sarah, it's Mike from The Meatery. Just checking on your order 66666 - everything arrive cold and sealed up okay?",
+          "Hey Sarah, it's Nick from The Meatery. Just checking on your order 66666 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "I understand. Our meats are processed in a facility that handles various products, but I can check specific allergen information for you. Let me find out and get back to you.",
           "You can usually find allergen information on our website under the product details section. If you need more specifics, feel free to reach out to our customer service."
@@ -1185,7 +1185,7 @@
       "category": "system_test",
       "simulation": {
         "agent_responses": [
-          "Hey Mark, it's Mike from The Meatery. Just checking on your order 77777 - everything arrive cold and sealed up okay?",
+          "Hey Mark, it's Nick from The Meatery. Just checking on your order 77777 - everything arrive cold and sealed up okay?",
           "Got it, thanks for letting me know.",
           "Alright, appreciate the update.",
           "Perfect. Enjoy those steaks!",
@@ -1233,7 +1233,7 @@
       "category": "b2b",
       "simulation": {
         "agent_responses": [
-          "Hey Restaurant_Mike, it's Mike from The Meatery. Just checking on your order 88888 - everything arrive cold and sealed up okay?",
+          "Hey Restaurant_Mike, it's Nick from The Meatery. Just checking on your order 88888 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
           "Sure, I'll email you at mike@giovannis.com. We'll get that sorted right away. Really sorry about that."
@@ -1285,7 +1285,7 @@
       "category": "positive_feedback",
       "simulation": {
         "agent_responses": [
-          "Hey Happy Helen, it's Mike from The Meatery. Just checking on your order 99999 - everything arrive cold and sealed up okay?",
+          "Hey Happy Helen, it's Nick from The Meatery. Just checking on your order 99999 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Perfect. Enjoy those steaks!",
           "Perfect. Enjoy those steaks!",
@@ -1335,7 +1335,7 @@
       "category": "safety_issue",
       "simulation": {
         "agent_responses": [
-          "Hey Concerned Carl, it's Mike from The Meatery. Just checking on your order 10001 - everything arrive cold and sealed up okay?",
+          "Hey Concerned Carl, it's Nick from The Meatery. Just checking on your order 10001 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "Is the vacuum seal still intact?",
           "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
@@ -1383,7 +1383,7 @@
       "category": "special_occasion",
       "simulation": {
         "agent_responses": [
-          "Hey Holiday Hannah, it's Mike from The Meatery. Just checking on your order 10002 - everything arrive cold and sealed up okay?",
+          "Hey Holiday Hannah, it's Nick from The Meatery. Just checking on your order 10002 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Nice choice. Reverse sear works great - 275 in the oven till it hits 120, then sear it hot for the crust.",
           "No worries! You can also use the touch test - press the steak with your finger. If it feels like the base of your thumb when your hand is relaxed, it's rare. A bit firmer, it's medium.",
@@ -1431,7 +1431,7 @@
       "category": "price_sensitive",
       "simulation": {
         "agent_responses": [
-          "Hey Bargain Bob, it's Mike from The Meatery. Just checking on your order 10003 - everything arrive cold and sealed up okay?",
+          "Hey Bargain Bob, it's Nick from The Meatery. Just checking on your order 10003 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "I understand. We focus on quality and sourcing the best cuts. Our meats are carefully selected and shipped directly to you.",
           "We offer premium quality and convenience. Plus, our customer service is here to help with any questions or issues.",
@@ -1481,7 +1481,7 @@
       "category": "feedback",
       "simulation": {
         "agent_responses": [
-          "Hey Eco Ellen, it's Mike from The Meatery. Just checking on your order 10004 - everything arrive cold and sealed up okay?",
+          "Hey Eco Ellen, it's Nick from The Meatery. Just checking on your order 10004 - everything arrive cold and sealed up okay?",
           "I hear you, Eco Ellen. We do use a lot of packaging to ensure the meat stays cold and safe during transit.",
           "I understand your concern. We're always looking for more sustainable options and appreciate your feedback.",
           "Currently, we don't have a return program for packaging, but it's something we're considering for the future. Thanks for bringing it up!"
@@ -1535,7 +1535,7 @@
       "category": "impaired",
       "simulation": {
         "agent_responses": [
-          "Hey Tipsy Tom, it's Mike from The Meatery. Just checking on your order 10005 - everything arrive cold and sealed up okay?",
+          "Hey Tipsy Tom, it's Nick from The Meatery. Just checking on your order 10005 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Perfect. Enjoy those steaks!",
           "I wish I could, but we can't do same-day deliveries. Keep an eye out for our next order!",
@@ -1635,7 +1635,7 @@
       "category": "expert_customer",
       "simulation": {
         "agent_responses": [
-          "Hey Sous Vide Steve, it's Mike from The Meatery. Just checking on your order 10007 - everything arrive cold and sealed up okay?",
+          "Hey Sous Vide Steve, it's Nick from The Meatery. Just checking on your order 10007 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Nice choice. For sous vide at 129°F, I'd say about 2 to 4 hours should be perfect for a ribeye.",
           "I'd go with a cast iron for a nice crust. Heat it up really hot before you sear.",
@@ -1683,7 +1683,7 @@
       "category": "change_request",
       "simulation": {
         "agent_responses": [
-          "Hey Modifier Mary, it's Mike from The Meatery. Just checking on your order 10008 - everything arrive cold and sealed up okay?",
+          "Hey Modifier Mary, it's Nick from The Meatery. Just checking on your order 10008 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
           "Sure, I can send you 10% off your next order. Text okay to this number?"
@@ -1735,7 +1735,7 @@
       "category": "gift",
       "simulation": {
         "agent_responses": [
-          "Hey Gifted Gary, it's Mike from The Meatery. Just checking on your order 10009 - everything arrive cold and sealed up okay?",
+          "Hey Gifted Gary, it's Nick from The Meatery. Just checking on your order 10009 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Nice choice. Go gentle with wagyu - quick sear, maybe a minute per side max.",
           "Sure, I can send you 10% off your next order. Text okay to this number?"
@@ -1787,7 +1787,7 @@
       "category": "competition",
       "simulation": {
         "agent_responses": [
-          "Hey Comparing Cathy, it's Mike from The Meatery. Just checking on your order 10010 - everything arrive cold and sealed up okay?",
+          "Hey Comparing Cathy, it's Nick from The Meatery. Just checking on your order 10010 - everything arrive cold and sealed up okay?",
           "Glad to hear it's okay! We focus on quality cuts, but I get the seasoning appeal. Need any cooking tips?",
           "We use top-notch vacuum sealing to ensure freshness, but I appreciate the feedback on insulation. Anything else I can help with?",
           "We believe in the quality of our meat. It's sourced from top farms, which is why it might be a bit more. Can I help with anything else?",
@@ -1842,7 +1842,7 @@
       "category": "external_factor",
       "simulation": {
         "agent_responses": [
-          "Hey Weather Wendy, it's Mike from The Meatery. Just checking on your order 10011 - everything arrive cold and sealed up okay?",
+          "Hey Weather Wendy, it's Nick from The Meatery. Just checking on your order 10011 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
           "I totally get it - but really, the vacuum seal is what keeps it fresh, not being frozen. Trust me, it's perfect quality. Want some cooking tips?",
@@ -1890,7 +1890,7 @@
       "category": "sales_opportunity",
       "simulation": {
         "agent_responses": [
-          "Hey Subscribe Sam, it's Mike from The Meatery. Just checking on your order 10012 - everything arrive cold and sealed up okay?",
+          "Hey Subscribe Sam, it's Nick from The Meatery. Just checking on your order 10012 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "Sure, I can send you 10% off your next order. Text okay to this number?",
           "Actually, you're a regular - I'll make it 15%.",
@@ -1943,7 +1943,7 @@
       "category": "product_question",
       "simulation": {
         "agent_responses": [
-          "Hey Portion Patty, it's Mike from The Meatery. Just checking on your order 10013 - everything arrive cold and sealed up okay?",
+          "Hey Portion Patty, it's Nick from The Meatery. Just checking on your order 10013 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "These ribeyes are pretty substantial! Generally, one ribeye can serve 2-3 people depending on appetite.",
           "Absolutely, you can cut it in half. Just make sure to wrap the other half tightly if you're storing it.",
@@ -1991,7 +1991,7 @@
       "category": "health_concern",
       "simulation": {
         "agent_responses": [
-          "Hey Medical Mike, it's Mike from The Meatery. Just checking on your order 10014 - everything arrive cold and sealed up okay?",
+          "Hey Medical Mike, it's Nick from The Meatery. Just checking on your order 10014 - everything arrive cold and sealed up okay?",
           "Got it. Our meats aren't pre-seasoned, so you should be good there.",
           "Our cuts are just the meat itself, no added salt or treatments.",
           "Meat does have some naturally occurring sodium, but it's minimal compared to processed foods.",
@@ -2044,7 +2044,7 @@
       "category": "storage_issue",
       "simulation": {
         "agent_responses": [
-          "Hey Freezer Frank, it's Mike from The Meatery. Just checking on your order 10015 - everything arrive cold and sealed up okay?",
+          "Hey Freezer Frank, it's Nick from The Meatery. Just checking on your order 10015 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "Is the vacuum seal still intact?",
           "Good news - that's actually totally normal! Meat often thaws during shipping but that doesn't affect quality at all. As long as it's cold and sealed, you're all set. You can cook it in the next couple days or pop it back in the freezer.",
@@ -2099,7 +2099,7 @@
       "category": "product_knowledge",
       "simulation": {
         "agent_responses": [
-          "Hey Specialty Sue, it's Mike from The Meatery. Just checking on your order 10016 - everything arrive cold and sealed up okay?",
+          "Hey Specialty Sue, it's Nick from The Meatery. Just checking on your order 10016 - everything arrive cold and sealed up okay?",
           "Great! Picanha is a fantastic choice. It's not quite like a regular steak - it's best cooked with the fat cap on for flavor.",
           "Not exactly. Keep the fat cap on while cooking for the best flavor.",
           "After cooking, slice it against the grain for tenderness. Enjoy!"
@@ -2146,7 +2146,7 @@
       "category": "retention",
       "simulation": {
         "agent_responses": [
-          "Hey Pete, it's Mike from The Meatery. Just checking on your order 10017 - everything arrive cold and sealed up okay?",
+          "Hey Pete, it's Nick from The Meatery. Just checking on your order 10017 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "I'm really sorry about that. I'm glad this time is better. Let me send you a 15% discount for the trouble. What's the best number for that text?",
           "I understand, and I'm glad you gave us another shot. We'll make sure this order is perfect.",
@@ -2194,7 +2194,7 @@
       "category": "order_accuracy",
       "simulation": {
         "agent_responses": [
-          "Hey Quantity Quinn, it's Mike from The Meatery. Just checking on your order 10018 - everything arrive cold and sealed up okay?",
+          "Hey Quantity Quinn, it's Nick from The Meatery. Just checking on your order 10018 - everything arrive cold and sealed up okay?",
           "Oh, I want to make sure everything's okay. What did you notice?",
           "That's definitely not right. I'm really sorry about that. I'll get a replacement sent out or process a refund - which would you prefer? And let me send you a 15% discount for the trouble. What's the best number for that text?",
           "We'll get that sorted right away. Really sorry about that."
@@ -2241,7 +2241,7 @@
       "category": "cultural",
       "simulation": {
         "agent_responses": [
-          "Hey Cultural Carlos, it's Mike from The Meatery. Just checking on your order 10019 - everything arrive cold and sealed up okay?",
+          "Hey Cultural Carlos, it's Nick from The Meatery. Just checking on your order 10019 - everything arrive cold and sealed up okay?",
           "Great! Need any cooking tips for what you got, or you all set?",
           "For carne asada, I'd recommend marinating it. A mix of lime juice, garlic, cilantro, and a bit of cumin works great.",
           "Yes, definitely marinate it. Lime, cilantro, garlic, and cumin are perfect. Let it sit for a few hours for the best flavor.",
@@ -2289,7 +2289,7 @@
       "category": "b2b_gift",
       "simulation": {
         "agent_responses": [
-          "Hey Carla, it's Mike from The Meatery. Just checking on your order 10020 - everything arrive cold and sealed up okay?",
+          "Hey Carla, it's Nick from The Meatery. Just checking on your order 10020 - everything arrive cold and sealed up okay?",
           "Great to hear they look good! I'll make a note to include gift messages next time.",
           "Absolutely, I'll note that for your account.",
           "Yes, we do offer custom packaging. I can have someone reach out to discuss options with you."
