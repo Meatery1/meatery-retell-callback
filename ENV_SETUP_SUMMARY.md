@@ -28,25 +28,18 @@ OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxx  # Your actual OpenAI key
 RETELL_API_KEY=key_xxxxxxxxxxxxx  # Your actual Retell key
 ```
 
-### 4. **Email Credentials** ⚠️ (Choose ONE option)
-
-#### Option A: Gmail with App Password (Simplest)
+### 4. **Email Credentials** ✅ (Google Service Account)
 ```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=hello@themeatery.com
-SMTP_PASS=YOUR_16_CHAR_APP_PASSWORD  # Get from Google Account settings
+ANALYTICS_CLIENT_EMAIL=meatery-dashboard@theta-voyager-423706-t9.iam.gserviceaccount.com
+ANALYTICS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+GMAIL_IMPERSONATED_USER=nicholas@themeatery.com
 SEND_FROM_EMAIL=hello@themeatery.com
 ```
-
-#### Option B: Google Service Account (More Complex)
-The service account in your list needs domain-wide delegation setup in Google Workspace Admin.
 
 ## ❌ NOT Needed from Your List
 
 All these can be ignored for this project:
 - `ALSOASKED_API_KEY` - Not used
-- `ANALYTICS_*` - Google Analytics (not used)
 - `ANTHROPIC_*` - Claude API (not used)
 - `AUTH_*` - Dashboard auth (not used)
 - `DATABASE_URL` - PostgreSQL (not used)
@@ -58,16 +51,16 @@ All these can be ignored for this project:
 - `SHIPSTATION_*` - Shipping (not used)
 - `SKIO_*` - Subscriptions (not used)
 - `VECTOR_DATABASE_URL` - Vector DB (not used)
+- `SMTP_*` - SMTP credentials (removed, using Google Service Account only)
 
 ## 🚀 Quick Setup Steps
 
 1. **Create .env file** with only the needed variables
-2. **Get Gmail App Password**:
-   - Go to https://myaccount.google.com/apppasswords
-   - Sign in as hello@themeatery.com
-   - Generate app password for "Mail"
-   - Copy the 16-character code
-3. **Update .env** with the app password
+2. **Ensure Google Service Account is configured**:
+   - Service account should already exist: `meatery-dashboard@theta-voyager-423706-t9.iam.gserviceaccount.com`
+   - Private key should be available in your environment
+   - Domain-wide delegation should be set up for Gmail
+3. **Update .env** with the service account credentials
 4. **Test**: `node test-email-tickets.js`
 
 ## 🎯 Current System Status
@@ -78,15 +71,15 @@ All these can be ignored for this project:
 | Server Endpoints | ✅ Ready | All endpoints working |
 | Shopify Integration | ✅ Ready | Connected to your store |
 | Email Templates | ✅ Ready | Professional HTML/text format |
-| Email Sending | ⚠️ Needs Config | Just add SMTP password |
+| Email Sending | ⚠️ Needs Config | Just add service account credentials |
 | Customer CC Logic | ✅ Ready | Auto-checks Shopify for email |
 
 ## 📧 How The Email System Works
 
 1. **Customer reports issue** → Agent calls refund/replacement tool
 2. **Tool checks Shopify** for customer email (99% have it)
-3. **If email found**: Sends ticket, CCs customer automatically
-4. **If email missing**: Sends ticket with warning, agent asks for email
+3. **If email found**: Sends ticket, CCs both nicholas@themeatery.com and customer automatically
+4. **If email missing**: Sends ticket with warning to nicholas@themeatery.com, agent asks for email
 5. **Commslayer receives** professional HTML ticket at hello@themeatery.com
 
 ## 🔐 Security Notes
@@ -95,7 +88,8 @@ All these can be ignored for this project:
 - The `.env` file is already in `.gitignore`
 - Keep backup of your credentials separately
 - Rotate API keys periodically
+- Google Service Account provides secure, token-based authentication
 
 ## 💡 Final Note
 
-Your system is **completely ready** - it just needs the Gmail app password to start sending emails. Everything else from your long list is for other projects/dashboards and not needed here.
+Your system is **completely ready** - it just needs the Google Service Account credentials to start sending emails. The SMTP integration has been removed in favor of the more secure and reliable Google Service Account approach.

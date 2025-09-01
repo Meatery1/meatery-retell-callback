@@ -8,7 +8,7 @@ The email ticket system sends automated tickets to your Commslayer system (hello
 ### 1. **Email Service Module** (`src/email-service.js`)
 - Sends professional HTML/text emails to hello@themeatery.com
 - Automatically CCs the customer (if email is available)
-- Supports both Google Service Account and SMTP authentication
+- Uses Google Service Account authentication for secure email sending
 - Three ticket types: Refund, Replacement, and General Support
 
 ### 2. **Updated Endpoints**
@@ -25,51 +25,32 @@ The email ticket system sends automated tickets to your Commslayer system (hello
 
 Add these to your `.env` file:
 
-### Option 1: Google Service Account (Recommended)
+### Google Service Account (Required)
 ```env
-# Path to your service account JSON file
-GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service-account-key.json
+# Service account credentials
+ANALYTICS_CLIENT_EMAIL=meatery-dashboard@theta-voyager-423706-t9.iam.gserviceaccount.com
+ANALYTICS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 
-# OR provide the JSON directly (better for deployment)
-GOOGLE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"...","private_key":"..."}'
-
-# The email address to send from
+# The email address to send from (must be a domain user)
+GMAIL_IMPERSONATED_USER=nicholas@themeatery.com
 SEND_FROM_EMAIL=hello@themeatery.com
-```
-
-### Option 2: SMTP Fallback
-```env
-# For Gmail, Outlook, or other SMTP services
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password  # Use App Password, not regular password
 ```
 
 ## 📝 Setting Up Google Service Account
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select existing
-3. Enable Gmail API
-4. Create a Service Account:
-   - Go to "IAM & Admin" > "Service Accounts"
-   - Click "Create Service Account"
-   - Name it (e.g., "meatery-email-sender")
-   - Grant role: "Service Account User"
-5. Create and download JSON key:
-   - Click on the service account
-   - Go to "Keys" tab
-   - Add Key > Create New Key > JSON
-   - Save the file securely
-6. Enable Domain-Wide Delegation (if using Google Workspace)
-7. Add the service account email to your Gmail/Workspace with send permissions
+1. **Service Account Already Exists**: `meatery-dashboard@theta-voyager-423706-t9.iam.gserviceaccount.com`
+2. **Ensure Domain-Wide Delegation is Enabled**:
+   - Go to [Google Workspace Admin](https://admin.google.com)
+   - Navigate to Security > API Controls > Domain-wide Delegation
+   - Add the service account email with scope: `https://www.googleapis.com/auth/gmail.send`
+3. **Verify Private Key Access**: Ensure the private key is available in your environment
+4. **Test the Setup**: Run the test script to verify everything works
 
 ## 🧪 Testing the Email System
 
 Run the test script:
 ```bash
-# Install new dependencies first
+# Install dependencies first
 npm install
 
 # Test both refund and replacement emails
@@ -98,6 +79,7 @@ The agent now uses proper "ticket filing" language:
 2. **Agent determines resolution** → Refund or Replacement
 3. **System automatically:**
    - Sends email ticket to hello@themeatery.com
+   - CCs nicholas@themeatery.com (always)
    - CCs the customer (if email available)
    - Updates Shopify order with tags and notes
    - Confirms to customer that ticket was filed
@@ -135,9 +117,9 @@ The agent now uses proper "ticket filing" language:
 
 ## 🚀 Going Live Checklist
 
-- [ ] Configure Google Service Account or SMTP
+- [ ] Configure Google Service Account credentials
 - [ ] Add environment variables to `.env`
-- [ ] Run `npm install` to get new dependencies
+- [ ] Run `npm install` to get dependencies
 - [ ] Test email sending with `node test-email-tickets.js`
 - [ ] Update agent prompt in Retell dashboard
 - [ ] Verify hello@themeatery.com receives test tickets
@@ -159,12 +141,17 @@ Check server logs for:
 - Ensure Gmail API is enabled in Google Cloud
 
 **"Invalid credentials"**
-- For Gmail: Use App Password, not regular password
-- For Service Account: Check JSON key is complete
-- Verify SEND_FROM_EMAIL has permission to send
+- Check ANALYTICS_PRIVATE_KEY is properly formatted
+- Verify domain-wide delegation is set up correctly
+- Ensure GMAIL_IMPERSONATED_USER has permission to send
 
 **Emails not received**
 - Check spam/junk folders
 - Verify hello@themeatery.com is correct
 - Test with a personal email first
 - Check server logs for error messages
+
+**Domain-wide delegation issues**
+- Verify service account email is added to Workspace Admin
+- Check scope includes `https://www.googleapis.com/auth/gmail.send`
+- Ensure 24-48 hours have passed for changes to propagate

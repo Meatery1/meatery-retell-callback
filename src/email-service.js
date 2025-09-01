@@ -3,10 +3,7 @@
  * Sends emails to Commslayer ticketing system with customer CC
  */
 
-import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
-import path from 'path';
-import fs from 'fs';
 
 // Initialize Gmail service with service account
 let transporter = null;
@@ -16,36 +13,13 @@ let transporter = null;
  */
 export async function initializeEmailService() {
   try {
-    // First check for SMTP configuration (simpler and more common)
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT || 587,
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-      
-      // Test the connection
-      try {
-        await transporter.verify();
-        console.log('✅ Email service initialized with SMTP successfully');
-        return true;
-      } catch (error) {
-        console.error('❌ SMTP connection failed:', error.message);
-        console.log('Falling back to Google Service Account...');
-      }
-    }
-    
     // Use Google Service Account with domain-wide delegation
     const serviceAccountEmail = process.env.ANALYTICS_CLIENT_EMAIL || 'meatery-dashboard@theta-voyager-423706-t9.iam.gserviceaccount.com';
     const privateKey = process.env.ANALYTICS_PRIVATE_KEY;
     const impersonatedUser = process.env.GMAIL_IMPERSONATED_USER || 'nicholas@themeatery.com';
     
     if (!privateKey) {
-      console.log('⚠️ Email service not configured - no SMTP or Google service account credentials found');
+      console.log('⚠️ Email service not configured - no Google service account credentials found');
       return false;
     }
 
@@ -195,10 +169,16 @@ Please process this refund request and update the customer within 24 hours.
 This ticket was automatically generated from a customer call on ${new Date().toLocaleString()}
   `;
 
+  // Build CC list: always include nicholas@themeatery.com + customer email if available
+  const ccList = ['nicholas@themeatery.com'];
+  if (customerEmail) {
+    ccList.push(customerEmail);
+  }
+
   const mailOptions = {
     from: process.env.SEND_FROM_EMAIL || 'hello@themeatery.com',
     to: 'hello@themeatery.com',
-    cc: customerEmail || undefined, // REQUIREMENT: Customer should be CC'd
+    cc: ccList.join(', '),
     subject,
     text: textContent,
     html: htmlContent,
@@ -301,10 +281,16 @@ Please arrange replacement shipment and notify the customer with tracking inform
 This ticket was automatically generated from a customer call on ${new Date().toLocaleString()}
   `;
 
+  // Build CC list: always include nicholas@themeatery.com + customer email if available
+  const ccList = ['nicholas@themeatery.com'];
+  if (customerEmail) {
+    ccList.push(customerEmail);
+  }
+
   const mailOptions = {
     from: process.env.SEND_FROM_EMAIL || 'hello@themeatery.com',
     to: 'hello@themeatery.com',
-    cc: customerEmail || undefined, // REQUIREMENT: Customer should be CC'd
+    cc: ccList.join(', '),
     subject,
     text: textContent,
     html: htmlContent,
@@ -398,10 +384,16 @@ This ticket was automatically generated from a customer call on ${new Date().toL
     'low': '5'
   };
 
+  // Build CC list: always include nicholas@themeatery.com + customer email if available
+  const ccList = ['nicholas@themeatery.com'];
+  if (customerEmail) {
+    ccList.push(customerEmail);
+  }
+
   const mailOptions = {
     from: process.env.SEND_FROM_EMAIL || 'hello@themeatery.com',
     to: 'hello@themeatery.com',
-    cc: customerEmail || undefined,
+    cc: ccList.join(', '),
     subject,
     text: textContent,
     html: htmlContent,
