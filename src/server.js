@@ -43,6 +43,9 @@ app.use(express.static("public"));
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const publicBaseUrl = process.env.PUBLIC_BASE_URL || ""; // e.g., https://your-ngrok-domain.ngrok.io
 
+// Default agent ID - always use this agent for all calls
+const DEFAULT_AGENT_ID = 'llm_7eed186989d2fba11fa1f9395bc7';
+
 // --- Data paths ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -244,7 +247,7 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
     // Required
     to_number: phone,
     from_number: fromNumber || process.env.RETELL_FROM_NUMBER,
-    override_agent_id: agentId || process.env.RETELL_AGENT_ID,
+    override_agent_id: DEFAULT_AGENT_ID, // Always use the default agent
     // Optional runtime variables
     metadata: { source: "meatery-post-delivery", ...vars, ...(metadata || {}) },
     // Inject variables for prompt interpolation in Retell LLM / conversation flow
@@ -500,10 +503,10 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
 
 // Simple in-memory test endpoint to place a single call
 app.post("/call", async (req, res) => {
-  const { phone, name, orderNumber, agentId, fromNumber, metadata } = req.body || {};
+  const { phone, name, orderNumber, fromNumber, metadata } = req.body || {};
   if (!phone) return res.status(400).json({ error: "phone required" });
   try {
-    const r = await placeConfirmationCall({ phone, customerName: name || "there", orderNumber, agentId, fromNumber, metadata });
+    const r = await placeConfirmationCall({ phone, customerName: name || "there", orderNumber, fromNumber, metadata });
     res.json(r);
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
@@ -629,7 +632,7 @@ app.get("/shopify/order-by-number", async (req, res) => {
 // Batch call with optional overrides
 app.post("/call/batch", async (req, res) => {
   try {
-    const { hours = 48, agentId, fromNumber, max_followup_questions, resolution_preference } = req.body || {};
+    const { hours = 48, fromNumber, max_followup_questions, resolution_preference } = req.body || {};
     if (!inCallWindow()) return res.status(403).json({ error: "Outside calling window" });
     const candidates = await fetchRecentDeliveredOrders({ hours });
     const dnc = new Set(readJson(dncPath, { phones: [] }).phones);
@@ -645,7 +648,6 @@ app.post("/call/batch", async (req, res) => {
           phone: c.phone,
           customerName: c.name,
           orderNumber: c.order_number,
-          agentId,
           fromNumber,
           metadata: {
             primary_item: c.primary_item,
@@ -935,9 +937,35 @@ app.post("/flow/capture-feedback", async (req, res) => {
   try {
     // Retell sends params in body.args
     const params = req.body?.args || req.body || {};
-    const { order_number, satisfied_score, had_issue, issue_notes, preferred_contact, requested_opt_out } = params;
-    const order = await shopifyGetOrderByNumber(order_number);
-    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    const { order_number, phone, customer_phone, satisfied_score, had_issue, issue_notes, preferred_contact, requested_opt_out } = params;
+    
+    let order = null;
+    let lookupMethod = '';
+    
+    // First try order number if provided
+    if (order_number) {
+      order = await shopifyGetOrderByNumber(order_number);
+      if (order) lookupMethod = 'order_number';
+    }
+    
+    // If no order found and we have a phone, try phone lookup
+    if (!order && (phone || customer_phone)) {
+      const phoneNumber = phone || customer_phone;
+      console.log(`No order found by number, trying phone lookup: ${phoneNumber}`);
+      order = await findLatestOrderForPhone(phoneNumber);
+      if (order) lookupMethod = 'phone';
+    }
+    
+    if (!order) {
+      console.log(`Order not found: order_number=${order_number}, phone=${phone || customer_phone}`);
+      return res.status(404).json({ 
+        error: "order_not_found",
+        speak: "I'm having trouble finding your order. Let me try a different approach to locate it."
+      });
+    }
+    
+    console.log(`Order found via ${lookupMethod}: #${order.order_number} for ${order.customer?.first_name || 'customer'}`);
+    
     const addTags = [];
     const notes = [];
     if (typeof satisfied_score === "number") notes.push(`Post-delivery satisfaction: ${satisfied_score}/10`);
@@ -951,7 +979,11 @@ app.post("/flow/capture-feedback", async (req, res) => {
         if (!data.phones.includes(phone)) { data.phones.push(phone); writeJson(dncPath, data); }
       }
     }
-    res.json({ ok: true });
+    res.json({ 
+      ok: true,
+      order_number: order.order_number,
+      lookup_method: lookupMethod
+    });
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
   }
@@ -961,9 +993,52 @@ app.post("/flow/request-replacement", async (req, res) => {
   try {
     // Retell sends params in body.args
     const params = req.body?.args || req.body || {};
-    const { order_number, item_title, quantity = 1, reason, issue_type } = params;
-    const order = await shopifyGetOrderByNumber(order_number);
-    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    const { order_number, phone, customer_phone, item_title, quantity = 1, reason, issue_type } = params;
+    
+    console.log('🔍 Replacement request - Debug info:');
+    console.log('   order_number:', order_number);
+    console.log('   phone:', phone);
+    console.log('   customer_phone:', customer_phone);
+    console.log('   params:', JSON.stringify(params, null, 2));
+    
+    let order = null;
+    let lookupMethod = '';
+    
+    // First try order number if provided
+    if (order_number) {
+      console.log('   Trying order number lookup:', order_number);
+      order = await shopifyGetOrderByNumber(order_number);
+      if (order) {
+        lookupMethod = 'order_number';
+        console.log('   ✅ Order found via order number');
+      } else {
+        console.log('   ❌ Order not found via order number');
+      }
+    }
+    
+    // If no order found and we have a phone, try phone lookup
+    if (!order && (phone || customer_phone)) {
+      const phoneNumber = phone || customer_phone;
+      console.log(`   No order found by number, trying phone lookup: ${phoneNumber}`);
+      order = await findLatestOrderForPhone(phoneNumber);
+      if (order) {
+        lookupMethod = 'phone';
+        console.log('   ✅ Order found via phone lookup:', order.order_number);
+      } else {
+        console.log('   ❌ Order not found via phone lookup');
+      }
+    }
+    
+    if (!order) {
+      console.log(`   ❌ Final result: Order not found`);
+      console.log(`   order_number=${order_number}, phone=${phone || customer_phone}`);
+      return res.status(404).json({ 
+        error: "order_not_found",
+        speak: "I'm having trouble finding your order. Let me try a different approach to locate it."
+      });
+    }
+    
+    console.log(`   ✅ Order found via ${lookupMethod}: #${order.order_number} for ${order.customer?.first_name || 'customer'}`);
     
     // Extract customer information - MUST get email for CC requirement
     const customerName = [order?.customer?.first_name, order?.customer?.last_name].filter(Boolean).join(" ") || "Valued Customer";
@@ -972,13 +1047,13 @@ app.post("/flow/request-replacement", async (req, res) => {
     
     // Log warning if no email found
     if (!customerEmail) {
-      console.error(`❌ CRITICAL: No customer email found for order #${order_number} - Customer CANNOT be CC'd on ticket`);
+      console.error(`❌ CRITICAL: No customer email found for order #${order.order_number} - Customer CANNOT be CC'd on ticket`);
     }
     
     // Send email ticket to Commslayer
     try {
       await sendReplacementTicket({
-        orderNumber: order_number,
+        orderNumber: order.order_number,
         customerName,
         customerEmail,
         customerPhone,
@@ -987,7 +1062,7 @@ app.post("/flow/request-replacement", async (req, res) => {
         reason,
         issueType: issue_type
       });
-      console.log(`✅ Replacement ticket emailed for order #${order_number}`);
+      console.log(`✅ Replacement ticket emailed for order #${order.order_number}`);
     } catch (emailError) {
       console.error(`⚠️ Failed to send replacement email ticket:`, emailError.message);
       // Continue even if email fails - we'll still update Shopify
@@ -1000,6 +1075,8 @@ app.post("/flow/request-replacement", async (req, res) => {
     
     res.json({ 
       ok: true,
+      order_number: order.order_number,
+      lookup_method: lookupMethod,
       speak: customerEmail 
         ? "I've filed a priority ticket with our support team for your replacement. You'll receive a copy of this ticket at your email, and they'll contact you within 24 hours with shipping details."
         : "I've filed a priority ticket with our support team for your replacement. To ensure you receive updates, can you please provide your email address?",
@@ -1008,6 +1085,7 @@ app.post("/flow/request-replacement", async (req, res) => {
       needs_email: !customerEmail
     });
   } catch (e) {
+    console.error('❌ Replacement endpoint error:', e.message);
     res.status(500).json({ error: e?.response?.data || e.message });
   }
 });
@@ -1016,7 +1094,7 @@ app.post("/flow/request-replacement", async (req, res) => {
 app.post("/flow/update-customer-email", async (req, res) => {
   try {
     const params = req.body?.args || req.body || {};
-    const { order_number, customer_email } = params;
+    const { order_number, phone, customer_phone, customer_email } = params;
     
     if (!customer_email || !customer_email.includes('@')) {
       return res.status(400).json({ 
@@ -1025,17 +1103,43 @@ app.post("/flow/update-customer-email", async (req, res) => {
       });
     }
     
-    const order = await shopifyGetOrderByNumber(order_number);
-    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    let order = null;
+    let lookupMethod = '';
+    
+    // First try order number if provided
+    if (order_number) {
+      order = await shopifyGetOrderByNumber(order_number);
+      if (order) lookupMethod = 'order_number';
+    }
+    
+    // If no order found and we have a phone, try phone lookup
+    if (!order && (phone || customer_phone)) {
+      const phoneNumber = phone || customer_phone;
+      console.log(`No order found by number, trying phone lookup: ${phoneNumber}`);
+      order = await findLatestOrderForPhone(phoneNumber);
+      if (order) lookupMethod = 'phone';
+    }
+    
+    if (!order) {
+      console.log(`Order not found: order_number=${order_number}, phone=${phone || customer_phone}`);
+      return res.status(404).json({ 
+        error: "order_not_found",
+        speak: "I'm having trouble finding your order. Let me try a different approach to locate it."
+      });
+    }
+    
+    console.log(`Order found via ${lookupMethod}: #${order.order_number} for ${order.customer?.first_name || 'customer'}`);
     
     // Update Shopify order note with the email
     const note = `Customer email provided during call: ${customer_email}`;
     await shopifyAppendNoteAndTags({ orderId: order.id, noteAppend: note, addTags: ["email-collected"] });
     
-    console.log(`✅ Customer email collected for order #${order_number}: ${customer_email}`);
+    console.log(`✅ Customer email collected for order #${order.order_number}: ${customer_email}`);
     
     res.json({ 
       ok: true,
+      order_number: order.order_number,
+      lookup_method: lookupMethod,
       speak: "Perfect, I've got your email. You'll receive a confirmation of this ticket shortly.",
       email_collected: true,
       customer_email: customer_email
@@ -1050,9 +1154,34 @@ app.post("/flow/request-refund", async (req, res) => {
   try {
     // Retell sends params in body.args
     const params = req.body?.args || req.body || {};
-    const { order_number, items, reason, preferred_resolution = 'refund' } = params;
-    const order = await shopifyGetOrderByNumber(order_number);
-    if (!order?.id) return res.status(404).json({ error: "order_not_found" });
+    const { order_number, phone, customer_phone, items, reason, preferred_resolution = 'refund' } = params;
+    
+    let order = null;
+    let lookupMethod = '';
+    
+    // First try order number if provided
+    if (order_number) {
+      order = await shopifyGetOrderByNumber(order_number);
+      if (order) lookupMethod = 'order_number';
+    }
+    
+    // If no order found and we have a phone, try phone lookup
+    if (!order && (phone || customer_phone)) {
+      const phoneNumber = phone || customer_phone;
+      console.log(`No order found by number, trying phone lookup: ${phoneNumber}`);
+      order = await findLatestOrderForPhone(phoneNumber);
+      if (order) lookupMethod = 'phone';
+    }
+    
+    if (!order) {
+      console.log(`Order not found: order_number=${order_number}, phone=${phone || customer_phone}`);
+      return res.status(404).json({ 
+        error: "order_not_found",
+        speak: "I'm having trouble finding your order. Let me try a different approach to locate it."
+      });
+    }
+    
+    console.log(`Order found via ${lookupMethod}: #${order.order_number} for ${order.customer?.first_name || 'customer'}`);
     
     // Extract customer information - MUST get email for CC requirement
     const customerName = [order?.customer?.first_name, order?.customer?.last_name].filter(Boolean).join(" ") || "Valued Customer";
@@ -1061,13 +1190,13 @@ app.post("/flow/request-refund", async (req, res) => {
     
     // Log warning if no email found
     if (!customerEmail) {
-      console.error(`❌ CRITICAL: No customer email found for order #${order_number} - Customer CANNOT be CC'd on ticket`);
+      console.error(`❌ CRITICAL: No customer email found for order #${order.order_number} - Customer CANNOT be CC'd on ticket`);
     }
     
     // Send email ticket to Commslayer
     try {
       await sendRefundTicket({
-        orderNumber: order_number,
+        orderNumber: order.order_number,
         customerName,
         customerEmail,
         customerPhone,
@@ -1075,7 +1204,7 @@ app.post("/flow/request-refund", async (req, res) => {
         reason,
         preferredResolution: preferred_resolution
       });
-      console.log(`✅ Refund ticket emailed for order #${order_number}`);
+      console.log(`✅ Refund ticket emailed for order #${order.order_number}`);
     } catch (emailError) {
       console.error(`⚠️ Failed to send refund email ticket:`, emailError.message);
       // Continue even if email fails - we'll still update Shopify
@@ -1088,6 +1217,8 @@ app.post("/flow/request-refund", async (req, res) => {
     
     res.json({ 
       ok: true,
+      order_number: order.order_number,
+      lookup_method: lookupMethod,
       speak: customerEmail 
         ? "I've filed a priority ticket with our support team for your refund. You'll receive a copy of this ticket at your email, and they'll process this within 24 hours."
         : "I've filed a priority ticket with our support team for your refund. To ensure you receive updates, can you please provide your email address?",
