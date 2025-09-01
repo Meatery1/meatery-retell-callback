@@ -44,7 +44,7 @@ const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const publicBaseUrl = process.env.PUBLIC_BASE_URL || ""; // e.g., https://your-ngrok-domain.ngrok.io
 
 // Default agent ID - always use this agent for all calls
-const DEFAULT_AGENT_ID = 'llm_7eed186989d2fba11fa1f9395bc7';
+const DEFAULT_AGENT_ID = 'agent_2f7a3254099b872da193df3133';
 
 // --- Data paths ---
 const __filename = fileURLToPath(import.meta.url);
