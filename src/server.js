@@ -1327,6 +1327,50 @@ app.post("/improve-agent", async (req, res) => {
   }
 });
 
+// 🧪 Test email endpoint
+app.post("/test-improvement-email", async (req, res) => {
+  try {
+    console.log('📧 Test improvement email requested');
+    
+    // Import the email function
+    const { sendDailyImprovementSummary } = await import('./email-service.js');
+    
+    const testSummaryData = {
+      analysis_date: new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
+      calls_analyzed: 25,
+      success_rate: '72.0',
+      improvements_made: true,
+      new_sections_added: {
+        "VOICEMAIL DETECTION": "Added comprehensive voicemail detection to prevent failed calls",
+        "DISCOUNT HANDLING": "Enhanced responses for discount requests with professional guidance"
+      },
+      priority_fixes: [
+        "Implement voicemail detection",
+        "Handle discount requests professionally",
+        "Improve call success rate"
+      ],
+      expected_improvement: "15-20% increase in success rate",
+      next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+      status: 'Test email - improvements applied successfully'
+    };
+    
+    const emailResult = await sendDailyImprovementSummary(testSummaryData);
+    
+    res.json({ 
+      ok: true, 
+      message: 'Test improvement email sent',
+      emailResult,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error sending test email:', error);
+    res.status(500).json({ 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Return the most recent webhook events from our JSONL log
 app.get("/calls/recent-log", (req, res) => {
   try {
