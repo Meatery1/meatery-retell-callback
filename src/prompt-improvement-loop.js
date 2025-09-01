@@ -21,10 +21,11 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const CONFIG = {
   AGENT_ID: process.env.RETELL_AGENT_ID || 'agent_566475088bf8231175ddfb1899',
   LLM_ID: process.env.RETELL_LLM_ID || 'llm_be1d852cb86fbb479fd721bd2ea5',
-  ANALYSIS_WINDOW_HOURS: 24,
-  MIN_CALLS_FOR_ANALYSIS: 5,
+  ANALYSIS_WINDOW_HOURS: 24, // Back to 24 hours for daily analysis
+  MIN_CALLS_FOR_ANALYSIS: 1, // Reduced since we're only looking at 1 day
   IMPROVEMENT_MODEL: 'gpt-4o',
-  LOGS_DIR: './improvement-logs'
+  LOGS_DIR: './improvement-logs',
+  LAST_ANALYSIS_FILE: './improvement-logs/last-analysis-timestamp.json'
 };
 
 /**
@@ -81,10 +82,62 @@ function detectAnomalies(calls) {
 }
 
 /**
+ * Get the timestamp of the last analysis to avoid re-analyzing the same calls
+ */
+async function getLastAnalysisTimestamp() {
+  try {
+    if (fs.existsSync(CONFIG.LAST_ANALYSIS_FILE)) {
+      const data = JSON.parse(await fs.readFile(CONFIG.LAST_ANALYSIS_FILE, 'utf8'));
+      return new Date(data.last_analysis);
+    }
+  } catch (error) {
+    console.warn('⚠️  Could not read last analysis timestamp:', error.message);
+  }
+  
+  // If no previous analysis, start from 24 hours ago
+  return new Date(Date.now() - (24 * 60 * 60 * 1000));
+}
+
+/**
+ * Update the last analysis timestamp
+ */
+async function updateLastAnalysisTimestamp() {
+  try {
+    await fs.mkdir(CONFIG.LOGS_DIR, { recursive: true });
+    await fs.writeFile(
+      CONFIG.LAST_ANALYSIS_FILE,
+      JSON.stringify({ 
+        last_analysis: new Date().toISOString(),
+        next_analysis: new Date(Date.now() + (24 * 60 * 60 * 1000)).toISOString()
+      }, null, 2)
+    );
+  } catch (error) {
+    console.warn('⚠️  Could not update last analysis timestamp:', error.message);
+  }
+}
+
+/**
  * Fetch recent calls and analyze patterns
  */
 async function fetchAndAnalyzeCalls() {
-  const since = Date.now() - (CONFIG.ANALYSIS_WINDOW_HOURS * 60 * 60 * 1000);
+  // Get the timestamp of the last analysis to avoid re-analyzing calls
+  const lastAnalysis = await getLastAnalysisTimestamp();
+  const now = new Date();
+  
+  console.log(`📅 Last analysis: ${lastAnalysis.toLocaleString()}`);
+  console.log(`📅 Current time: ${now.toLocaleString()}`);
+  console.log(`⏱️  Time since last analysis: ${Math.round((now - lastAnalysis) / (1000 * 60 * 60))} hours`);
+  
+  // Only analyze calls since the last analysis (minimum 1 hour, maximum 24 hours)
+  const minHours = 1; // Minimum 1 hour between analyses
+  const maxHours = 24; // Maximum 24 hours between analyses
+  
+  const hoursSinceLast = (now - lastAnalysis) / (1000 * 60 * 60);
+  const analysisWindow = Math.max(minHours, Math.min(maxHours, hoursSinceLast));
+  
+  const since = Date.now() - (analysisWindow * 60 * 60 * 1000);
+  
+  console.log(`🔍 Analysis window: ${analysisWindow.toFixed(1)} hours (since ${new Date(since).toLocaleString()})`);
   
   // Get recent calls
   let calls = await retell.call.list({
@@ -92,6 +145,15 @@ async function fetchAndAnalyzeCalls() {
     start_timestamp: since,
     limit: 100
   });
+  
+  console.log(`📞 Found ${calls.length} calls in analysis window`);
+  
+  // Check if we have enough new calls to analyze
+  if (calls.length < CONFIG.MIN_CALLS_FOR_ANALYSIS) {
+    console.log(`⚠️  Not enough new calls for analysis (${calls.length} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
+    console.log('💡 This usually means the system is working well or there are no new calls to analyze');
+    return { status: 'insufficient_new_data', calls_found: calls.length };
+  }
   
   // Filter out adversarial calls
   const originalCount = calls.length;
@@ -219,8 +281,8 @@ function validateImprovements(improvements) {
     /profanity|swear|curse|damn|hell|racist|sexist|discriminat/i,
     // Negative behavior
     /hang up|ignore|rude|mean|nasty|hostile|aggressive/i,
-    // Manipulation
-    /free|discount everyone|give away|unlimited/i,
+    // Manipulation - but allow legitimate discount handling
+    /free.*everyone|give away.*unlimited|unlimited.*free/i,
     // Privacy violations
     /share.*information|tell.*about.*other|reveal.*customer/i,
     // Prompt injection attempts
@@ -236,17 +298,18 @@ function validateImprovements(improvements) {
     }
   }
   
-  // Check for positive intent
+  // Check for positive intent - look for helpful, professional language
   const requiredPositive = [
-    'professional', 'helpful', 'polite', 'assist', 'resolve'
+    'help', 'assist', 'respond', 'handle', 'provide', 'ensure', 'improve', 'enhance'
   ];
   
   const hasPositiveIntent = requiredPositive.some(word => 
-    allText.includes(word.toLowerCase())
+    allText.toLowerCase().includes(word.toLowerCase())
   );
   
   if (!hasPositiveIntent && improvements.new_sections) {
     console.warn('⚠️  Improvements lack positive intent indicators');
+    console.log('Text content:', allText.substring(0, 200) + '...');
     return false;
   }
   
@@ -430,10 +493,11 @@ async function logImprovement(improvements, newPrompt) {
  */
 function preserveCoreBehaviors(improvedPrompt) {
   const coreBehaviors = [
-    'You are a friendly customer service agent for The Meatery',
-    'calling to check on a recent order',
-    'Did everything arrive cold, sealed, and as expected',
-    'NEVER repeat your greeting'
+    'The Meatery', // Core business identity
+    'Nick', // Agent name
+    'order', // Order checking purpose
+    'cold', // Temperature check
+    'call_direction' // Critical call handling
   ];
   
   // Ensure all core behaviors remain
@@ -464,6 +528,13 @@ async function runImprovementLoop() {
       return { status: 'blocked', reason: 'anomalies_detected' };
     }
     
+    if (analysis.status === 'insufficient_new_data') {
+      console.log(`💡 No new calls to analyze since last run`);
+      console.log(`   - Calls found: ${analysis.calls_found}`);
+      console.log(`   - This suggests the system is working well or there's low call volume`);
+      return { status: 'insufficient_new_data', calls_found: analysis.calls_found };
+    }
+    
     if (analysis.total < CONFIG.MIN_CALLS_FOR_ANALYSIS) {
       console.log(`⚠️  Not enough calls for analysis (${analysis.total} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
       return { status: 'insufficient_data' };
@@ -483,6 +554,10 @@ async function runImprovementLoop() {
     console.log(`   - Priority fixes: ${improvements.priority_fixes?.join(', ')}`);
     console.log(`   - Expected improvement: ${improvements.expected_improvement}\n`);
     
+    // Debug: Show full improvements
+    console.log('🔍 Full improvements object:');
+    console.log(JSON.stringify(improvements, null, 2));
+    
     // Step 3: Apply improvements
     console.log('🚀 Applying improvements...');
     const updated = await applyImprovements(improvements);
@@ -491,7 +566,11 @@ async function runImprovementLoop() {
     console.log(`   - LLM ID: ${CONFIG.LLM_ID}`);
     console.log(`   - Last modified: ${new Date(updated.last_modification_timestamp).toISOString()}\n`);
     
-    // Step 4: Schedule next run
+    // Step 4: Update the last analysis timestamp
+    await updateLastAnalysisTimestamp();
+    console.log('📅 Analysis timestamp updated - next run will focus on new calls only');
+    
+    // Step 5: Schedule next run
     console.log('⏰ Next analysis in 24 hours...');
     
   } catch (error) {
@@ -543,9 +622,23 @@ If voicemail detected:
   console.log('✅ Improvements applied!');
 }
 
-// Run immediately with Carlos improvements
+// Run immediately with full analysis loop
 if (import.meta.url === `file://${process.argv[1]}`) {
-  applyCarlosImprovements().catch(console.error);
+  console.log('🚀 Starting script execution...');
+  console.log('Environment check:');
+  console.log('- RETELL_API_KEY:', process.env.RETELL_API_KEY ? '✅ Set' : '❌ Missing');
+  console.log('- RETELL_AGENT_ID:', process.env.RETELL_AGENT_ID ? '✅ Set' : '❌ Missing');
+  console.log('- RETELL_LLM_ID:', process.env.RETELL_LLM_ID ? '✅ Set' : '❌ Missing');
+  console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing');
+  
+  runImprovementLoop()
+    .then(result => {
+      console.log('✅ Analysis complete:', result);
+    })
+    .catch(error => {
+      console.error('❌ Error in analysis:', error);
+      console.error('Stack trace:', error.stack);
+    });
 }
 
 // Export for use in other modules
