@@ -378,21 +378,31 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
       return res.status(400).send("invalid-event");
     }
     
-    // Only log if it's actually a Retell event
+    // Handle both old and new Retell webhook formats
+    let type, data;
     if (event.type && event.data) {
-      console.log("Retell Webhook:", event.type, event.data?.call_id || 'no-call-id');
+      // Old format: {type: "call_started", data: {...}}
+      type = event.type;
+      data = event.data;
+      console.log("Retell Webhook (old format):", type, data?.call_id || 'no-call-id');
+    } else if (event.event && event.call) {
+      // New format: {event: "call_started", call: {...}}
+      type = event.event;
+      data = event.call;
+      console.log("Retell Webhook:", type, data?.call_id || 'no-call-id');
     } else {
-      console.log("Retell Webhook: Unexpected format -", JSON.stringify(event).substring(0, 200));
+      console.log("Retell Webhook: Unknown format -", JSON.stringify(event).substring(0, 200));
+      return res.status(200).send("ok");
     }
-    try { appendJsonl(callsLogPath, { received_at: new Date().toISOString(), ...event }); } catch (_) {}
+    
+    try { appendJsonl(callsLogPath, { received_at: new Date().toISOString(), type, data }); } catch (_) {}
     // Best-effort Shopify side-effects
     (async () => {
       try {
-        const type = event?.type;
-        const m = event?.data?.metadata || {};
-        const analysis = event?.data?.analysis || {};
-        const structured = analysis?.structured || {};
-        const transcript = event?.data?.transcript || "";
+        const m = data?.metadata || {};
+        const analysis = data?.analysis || data?.call_analysis || {};
+        const structured = analysis?.structured || analysis?.custom_analysis_data || {};
+        const transcript = data?.transcript || "";
         const orderNumber = m.order_number || structured.order_number;
         
         // Check if discount should be sent
