@@ -11,7 +11,6 @@ import {
   createAndSendKlaviyoDiscount,
   sendKlaviyoDiscountWithCheckout
 } from './klaviyo-events-integration.js';
-import { checkDiscountEligibility } from './klaviyo-email-service.js';
 import {
   fetchAbandonedCheckouts,
   formatCheckoutForCall,
@@ -770,11 +769,10 @@ app.post("/tools/send-discount", async (req, res) => {
     }
 
     // Check eligibility first
-    const eligibility = await checkDiscountEligibility({
-      customerEmail: customer_email,
-      customerPhone: customer_phone,
-      orderNumber: order_number
-    });
+    const eligibility = await checkAbandonedCheckoutDiscountEligibility(
+      customer_email,
+      total_value || 100
+    );
 
     if (!eligibility.eligible) {
       return res.json({
@@ -834,11 +832,10 @@ app.post("/tools/check-discount-eligibility", async (req, res) => {
   try {
     const { customer_phone, customer_email, order_number } = req.body;
     
-    const eligibility = await checkDiscountEligibility({
-      customerEmail: customer_email,
-      customerPhone: customer_phone,
-      orderNumber: order_number
-    });
+    const eligibility = await checkAbandonedCheckoutDiscountEligibility(
+      customer_email,
+      100 // Default value for checking
+    );
 
     res.json(eligibility);
   } catch (error) {
