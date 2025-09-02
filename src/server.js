@@ -15,7 +15,7 @@ import {
   fetchAbandonedCheckouts,
   formatCheckoutForCall,
   checkCustomerHistory,
-  checkDiscountEligibility as checkAbandonedCheckoutDiscountEligibility
+  checkDiscountEligibility
 } from './abandoned-checkout-service.js';
 import {
   initializeEmailService,
@@ -769,7 +769,7 @@ app.post("/tools/send-discount", async (req, res) => {
     }
 
     // Check eligibility first
-    const eligibility = await checkAbandonedCheckoutDiscountEligibility(
+    const eligibility = await checkDiscountEligibility(
       customer_email,
       params.total_value || 100
     );
