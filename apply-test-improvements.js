@@ -13,7 +13,7 @@ dotenv.config();
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 
 const CONFIG = {
-  LLM_ID: process.env.RETELL_LLM_ID || 'llm_be1d852cb86fbb479fd721bd2ea5',
+  LLM_ID: process.env.RETELL_LLM_ID || 'llm_7eed186989d2fba11fa1f9395bc7',
   MIN_SUCCESS_RATE: 80, // Minimum acceptable success rate
   AUTO_APPLY_THRESHOLD: 95 // Auto-apply if current success rate is below this
 };

@@ -27,8 +27,8 @@ async function updateCorrectAgent() {
     const currentLLM = await retell.llm.retrieve(CORRECT_LLM_ID);
     console.log('✅ Retrieved current LLM configuration');
     
-    // Get the updated prompt from the WRONG agent that has our improvements
-    const updatedLLM = await retell.llm.retrieve('llm_be1d852cb86fbb479fd721bd2ea5');
+    // Get the updated prompt from the correct agent that has our improvements
+    const updatedLLM = await retell.llm.retrieve('llm_7eed186989d2fba11fa1f9395bc7');
     console.log('✅ Retrieved improvements from updated LLM\n');
     
     // Show what's being added

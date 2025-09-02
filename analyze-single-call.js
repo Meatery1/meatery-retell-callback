@@ -15,8 +15,8 @@ const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const CONFIG = {
-  AGENT_ID: process.env.RETELL_AGENT_ID || 'agent_566475088bf8231175ddfb1899',
-  LLM_ID: process.env.RETELL_LLM_ID || 'llm_be1d852cb86fbb479fd721bd2ea5',
+  AGENT_ID: process.env.RETELL_AGENT_ID || 'agent_2f7a3254099b872da193df3133',
+  LLM_ID: process.env.RETELL_LLM_ID || 'llm_7eed186989d2fba11fa1f9395bc7',
   IMPROVEMENT_MODEL: 'gpt-4o'
 };
 

@@ -20,8 +20,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Configuration
 const CONFIG = {
-  AGENT_ID: process.env.RETELL_AGENT_ID || 'agent_566475088bf8231175ddfb1899',
-  LLM_ID: process.env.RETELL_LLM_ID || 'llm_be1d852cb86fbb479fd721bd2ea5',
+  AGENT_ID: process.env.RETELL_AGENT_ID || 'agent_2f7a3254099b872da193df3133',
+  LLM_ID: process.env.RETELL_LLM_ID || 'llm_7eed186989d2fba11fa1f9395bc7',
   ANALYSIS_WINDOW_HOURS: 24, // Back to 24 hours for daily analysis
   MIN_CALLS_FOR_ANALYSIS: 1, // Reduced since we're only looking at 1 day
   IMPROVEMENT_MODEL: 'gpt-4o',
@@ -278,8 +278,10 @@ function extractIssueFromTranscript(transcript) {
  */
 function validateImprovements(improvements) {
   const forbidden = [
-    // Offensive content
-    /profanity|swear|curse|damn|hell|racist|sexist|discriminat/i,
+    // Offensive content - more specific patterns to avoid false positives
+    /fuck|shit|bitch|asshole|cunt|nigger|faggot|whore|slut/i,
+    /profanity|swear|curse/i,
+    /racist|sexist|discriminat/i,
     // Negative behavior
     /hang up|ignore|rude|mean|nasty|hostile|aggressive/i,
     // Manipulation - but allow legitimate discount handling
