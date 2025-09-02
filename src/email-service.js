@@ -462,10 +462,10 @@ export async function sendDailyImprovementSummary(summaryData) {
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🤖 Daily Agent Improvement Summary</h1>
-        <p>${analysis_date}</p>
-    </div>
+            <div class="header">
+            <h1>Daily Agent Improvement Summary</h1>
+            <p>${analysis_date}</p>
+        </div>
     
     <div class="content">
         <div class="metric">
@@ -525,7 +525,11 @@ export async function sendDailyImprovementSummary(summaryData) {
     const mailOptions = {
       to: 'nicholas@themeatery.com',
       subject: subject,
-      html: html
+      html: html,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Transfer-Encoding': '8bit'
+      }
     };
 
     const result = await transporter.sendMail(mailOptions);
