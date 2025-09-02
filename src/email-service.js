@@ -441,7 +441,7 @@ export async function sendDailyImprovementSummary(summaryData) {
       status
     } = summaryData;
 
-    const subject = `🤖 Daily Agent Improvement Summary - ${analysis_date}`;
+    const subject = `Daily Agent Improvement Summary - ${analysis_date}`;
     
     const html = `
 <!DOCTYPE html>
