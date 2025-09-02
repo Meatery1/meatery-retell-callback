@@ -792,7 +792,7 @@ app.post("/tools/send-discount", async (req, res) => {
 
     // Create and send the discount via email
           const result = await createAndSendKlaviyoDiscount({
-        customerEmail: customer_email || customer_phone, // Use email if available, fallback to phone
+        customerEmail: customer_email, // Only use email if it exists
         customerName: customer_name || 'Valued Customer',
         customerPhone: customer_phone,
         discountType: discount_type,
@@ -800,7 +800,7 @@ app.post("/tools/send-discount", async (req, res) => {
         reason: reason,
         orderNumber: order_number,
         abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || null,
-        preferredChannel: customer_phone ? 'sms' : 'email'
+        preferredChannel: customer_email ? 'email' : 'sms' // Use email if available, otherwise SMS
       });
 
     if (result.success) {
