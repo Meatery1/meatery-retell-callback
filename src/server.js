@@ -12,6 +12,12 @@ import {
   checkDiscountEligibility 
 } from './discount-sms-service.js';
 import {
+  fetchAbandonedCheckouts,
+  formatCheckoutForCall,
+  checkCustomerHistory,
+  checkDiscountEligibility as checkAbandonedCheckoutDiscountEligibility
+} from './abandoned-checkout-service.js';
+import {
   initializeEmailService,
   sendRefundTicket,
   sendReplacementTicket,
@@ -1387,6 +1393,203 @@ app.get("/calls/recent-log", (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// --- Abandoned Checkout Recovery Endpoints ---
+
+// Batch process abandoned checkouts
+app.post("/call/abandoned-checkout", async (req, res) => {
+  try {
+    if (!inCallWindow()) {
+      return res.status(403).json({ error: "Outside calling window" });
+    }
+    
+    const { hours = 24, minValue = 50, maxCalls = 10 } = req.body || {};
+    
+    const result = await processAbandonedCheckouts({ hours, minValue, maxCalls });
+    
+    res.json({
+      success: true,
+      message: `Processed ${result.processed} abandoned checkouts`,
+      ...result
+    });
+    
+  } catch (error) {
+    console.error('Abandoned checkout call error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: "Failed to process abandoned checkouts"
+    });
+  }
+});
+
+// Individual abandoned checkout call
+app.post("/call/abandoned-checkout/single", async (req, res) => {
+  try {
+    if (!inCallWindow()) {
+      return res.status(403).json({ error: "Outside calling window" });
+    }
+    
+    const { checkoutId, phone, customerName, itemsSummary, totalPrice, currency, email } = req.body;
+    
+    if (!phone || !itemsSummary) {
+      return res.status(400).json({ error: "Missing required fields: phone, itemsSummary" });
+    }
+    
+    const result = await placeAbandonedCheckoutCall({
+      checkoutId,
+      phone,
+      customerName: customerName || 'there',
+      itemsSummary,
+      totalPrice: totalPrice || 0,
+      currency: currency || 'USD',
+      email
+    });
+    
+    res.json({ success: true, ...result });
+    
+  } catch (error) {
+    console.error('Single abandoned checkout call error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: "Failed to place abandoned checkout call"
+    });
+  }
+});
+
+// Helper function to process abandoned checkouts (imported from service)
+async function processAbandonedCheckouts({ hours = 24, minValue = 50, maxCalls = 10 } = {}) {
+  try {
+    console.log('🔄 Processing abandoned checkouts...\n');
+    
+    const checkouts = await fetchAbandonedCheckouts({ hours, minValue });
+    console.log(`Found ${checkouts.length} abandoned checkouts\n`);
+    
+    if (checkouts.length === 0) {
+      console.log('✅ No abandoned checkouts to process');
+      return { processed: 0, calls_placed: 0, skipped: 0 };
+    }
+    
+    const results = [];
+    let callsPlaced = 0;
+    let skipped = 0;
+    
+    for (const checkout of checkouts.slice(0, maxCalls)) {
+      try {
+        const formatted = formatCheckoutForCall(checkout);
+        
+        if (callsPlaced >= maxCalls) {
+          console.log(`⏸️ Reached maximum call limit (${maxCalls})`);
+          break;
+        }
+        
+        const result = await placeAbandonedCheckoutCall(formatted);
+        
+        if (result.skipped) {
+          skipped++;
+          results.push({ ...formatted, result });
+        } else {
+          callsPlaced++;
+          results.push({ ...formatted, result });
+        }
+        
+        // Rate limiting - wait between calls
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
+        console.error(`❌ Error processing checkout ${checkout.id}:`, error.message);
+        results.push({ ...formatCheckoutForCall(checkout), error: error.message });
+      }
+    }
+    
+    console.log(`\n📊 Summary:`);
+    console.log(`   Total found: ${checkouts.length}`);
+    console.log(`   Calls placed: ${callsPlaced}`);
+    console.log(`   Skipped: ${skipped}`);
+    console.log(`   Errors: ${results.filter(r => r.error).length}`);
+    
+    return {
+      processed: checkouts.length,
+      calls_placed: callsPlaced,
+      skipped: skipped,
+      results
+    };
+    
+  } catch (error) {
+    console.error('❌ Error processing abandoned checkouts:', error.message);
+    throw error;
+  }
+}
+
+// Helper function to place individual abandoned checkout calls (imported from service)
+async function placeAbandonedCheckoutCall({
+  checkoutId,
+  phone,
+  customerName,
+  itemsSummary,
+  totalPrice,
+  currency = 'USD',
+  email = null
+}) {
+  try {
+    // Check if customer has recent successful orders
+    const { hasRecentOrders, lastOrderDate } = await checkCustomerHistory(phone, email);
+    
+    if (hasRecentOrders) {
+      console.log(`⚠️ Skipping ${phone} - customer has recent successful orders`);
+      return { skipped: true, reason: 'recent_successful_orders', lastOrderDate };
+    }
+    
+    // Format phone number
+    const toNumber = phone.startsWith('+') ? phone : `+1${phone.replace(/\D/g, '')}`;
+    
+    console.log(`📞 Placing Abandoned Checkout Recovery Call`);
+    console.log(`==========================================\n`);
+    console.log(`To: ${toNumber}`);
+    console.log(`Customer: ${customerName}`);
+    console.log(`Items: ${itemsSummary}`);
+    console.log(`Total: ${currency} ${totalPrice}\n`);
+    
+    const call = await retell.call.createPhoneCall({
+      from_number: process.env.RETELL_FROM_NUMBER || '+16198212984',
+      to_number: toNumber,
+      override_agent_id: 'agent_e2636fcbe1c89a7f6bd0731e11', // Grace's agent ID
+      
+      // Dynamic variables for the abandoned checkout agent
+      retell_llm_dynamic_variables: {
+        call_direction: 'OUTBOUND',
+        customer_name: customerName,
+        items_summary: itemsSummary,
+        total_price: totalPrice,
+        currency: currency,
+        checkout_id: checkoutId,
+        customer_phone: phone,
+        customer_email: email,
+        is_abandoned_checkout: true
+      },
+      
+      metadata: {
+        source: 'abandoned_checkout_recovery',
+        checkout_id: checkoutId,
+        customer_phone: phone,
+        customer_name: customerName,
+        items_summary: itemsSummary,
+        total_price: totalPrice,
+        currency: currency,
+        customer_email: email
+      }
+    });
+    
+    console.log('✅ Abandoned checkout recovery call initiated!\n');
+    console.log(`Call ID: ${call.call_id}`);
+    console.log(`Status: ${call.call_status}\n`);
+    
+    return { success: true, call_id: call.call_id, call_status: call.call_status };
+    
+  } catch (error) {
+    console.error('❌ Failed to place abandoned checkout call:', error.message);
+    throw error;
+  }
+}
 
 const port = process.env.PORT || 8080;
 
