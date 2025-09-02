@@ -8,6 +8,9 @@ import { google } from 'googleapis';
 // Initialize Gmail service with service account
 let transporter = null;
 
+// Export transporter for use by other modules
+export { transporter };
+
 /**
  * Initialize the email transporter with Google service account
  */
@@ -16,7 +19,7 @@ export async function initializeEmailService() {
     // Use Google Service Account with domain-wide delegation
     const serviceAccountEmail = process.env.ANALYTICS_CLIENT_EMAIL || 'meatery-dashboard@theta-voyager-423706-t9.iam.gserviceaccount.com';
     const privateKey = process.env.ANALYTICS_PRIVATE_KEY;
-    const impersonatedUser = process.env.GMAIL_IMPERSONATED_USER || 'nicholas@themeatery.com';
+    const impersonatedUser = 'grace@themeatery.com'; // Force Grace as the impersonated user
     
     if (!privateKey) {
       console.log('⚠️ Email service not configured - no Google service account credentials found');
@@ -44,9 +47,13 @@ export async function initializeEmailService() {
     // Create custom transporter using Gmail API
     transporter = {
       sendMail: async (mailOptions) => {
+        // Determine the sender - use Grace@TheMeatery.com if specified, otherwise use impersonated user
+        const fromEmail = mailOptions.from || impersonatedUser;
+        const fromName = fromEmail.includes('Grace@TheMeatery.com') ? 'Grace' : impersonatedUser.split('@')[0];
+        
         // Build the email in RFC 2822 format
         const messageParts = [
-          `From: "${impersonatedUser.split('@')[0]}" <${impersonatedUser}>`,
+          `From: "${fromName}" <${fromEmail}>`,
           `To: ${mailOptions.to}`
         ];
         

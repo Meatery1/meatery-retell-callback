@@ -11,7 +11,7 @@ const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const YOUR_CHECKOUT_DATA = {
   checkoutId: '37329230495960',
   phone: '16194587071', // This will be overridden
-  customerName: 'Jack',
+  customerName: 'Jimmy',
   itemsSummary: '1x SavedBy Package Protection ($2.97), 1x Japanese A5 Wagyu Ribeye',
   totalPrice: 153.78,
   currency: 'USD',
