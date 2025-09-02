@@ -7,10 +7,11 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { 
-  createAndSendDiscount, 
-  checkDiscountEligibility 
-} from './discount-sms-service.js';
+import {
+  createAndSendKlaviyoDiscount,
+  sendKlaviyoDiscountWithCheckout
+} from './klaviyo-events-integration.js';
+import { checkDiscountEligibility } from './klaviyo-email-service.js';
 import {
   fetchAbandonedCheckouts,
   formatCheckoutForCall,
@@ -523,15 +524,17 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
                   discountValue = 15;
                 }
                 
-                const discountResult = await createAndSendDiscount({
-                  customerPhone,
-                  customerName,
-                  customerEmail,
-                  discountType: 'percentage',
-                  discountValue: discountValue,
-                  reason: structured.discount_reason || 'customer_service',
-                  orderNumber
-                });
+                        const discountResult = await createAndSendKlaviyoDiscount({
+          customerEmail: customerEmail || customerPhone, // Use email if available, fallback to phone
+          customerName,
+          customerPhone,
+          discountType: 'percentage',
+          discountValue: discountValue,
+          reason: structured.discount_reason || 'customer_service',
+          orderNumber,
+          abandonedCheckoutId: m.checkout_id || structured.checkout_id || null,
+          preferredChannel: customerPhone ? 'sms' : 'email'
+        });
                 
                 if (discountResult.success) {
                   console.log(`✅ Discount sent: ${discountResult.discount.code}`);
@@ -789,23 +792,25 @@ app.post("/tools/send-discount", async (req, res) => {
       finalDiscountValue = 15;
     }
 
-    // Create and send the discount
-    const result = await createAndSendDiscount({
-      customerPhone: customer_phone,
-      customerName: customer_name || 'Valued Customer',
-      customerEmail: customer_email,
-      discountType: discount_type,
-      discountValue: finalDiscountValue,
-      reason: reason,
-      orderNumber: order_number
-    });
+    // Create and send the discount via email
+          const result = await createAndSendKlaviyoDiscount({
+        customerEmail: customer_email || customer_phone, // Use email if available, fallback to phone
+        customerName: customer_name || 'Valued Customer',
+        customerPhone: customer_phone,
+        discountType: discount_type,
+        discountValue: finalDiscountValue,
+        reason: reason,
+        orderNumber: order_number,
+        abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || null,
+        preferredChannel: customer_phone ? 'sms' : 'email'
+      });
 
     if (result.success) {
       res.json({
         success: true,
         discount_code: result.discount.code,
         message: result.summary,
-        speak: `Perfect! I've just texted you a ${finalDiscountValue}% off discount code to use on your next order. You should receive it within a few seconds. The code is ${result.discount.code.split('').join(' ')} and it's good for 30 days.`
+        speak: `Perfect! I've just emailed you a ${finalDiscountValue}% off discount code to use on your next order. You should receive it within a few minutes. The code is ${result.discount.code.split('').join(' ')} and it's good for 30 days.`
       });
     } else {
       res.json({

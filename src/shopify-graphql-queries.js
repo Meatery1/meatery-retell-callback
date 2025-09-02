@@ -21,7 +21,6 @@ const ABANDONED_CHECKOUTS_QUERY = `
           createdAt
           updatedAt
           completedAt
-          closedAt
           note
           customAttributes {
             key
@@ -33,12 +32,12 @@ const ABANDONED_CHECKOUTS_QUERY = `
             lastName
             email
             phone
+            displayName
           }
           billingAddress {
             firstName
             lastName
             phone
-            email
             address1
             city
             province
@@ -49,7 +48,6 @@ const ABANDONED_CHECKOUTS_QUERY = `
             firstName
             lastName
             phone
-            email
             address1
             city
             province
@@ -115,8 +113,6 @@ const ABANDONED_CHECKOUTS_QUERY = `
             }
           }
           taxesIncluded
-          currencyCode
-          presentmentCurrencyCode
         }
       }
       pageInfo {
@@ -134,109 +130,107 @@ const ABANDONED_CHECKOUTS_QUERY = `
  */
 const ABANDONED_CHECKOUT_BY_ID_QUERY = `
   query GetAbandonedCheckoutById($id: ID!) {
-    abandonedCheckout(id: $id) {
-      id
-      name
-      abandonedCheckoutUrl
-      createdAt
-      updatedAt
-      completedAt
-      closedAt
-      note
-      customAttributes {
-        key
-        value
-      }
-      customer {
+    abandonmentByAbandonedCheckoutId(abandonedCheckoutId: $id) {
+      abandonedCheckout {
         id
-        firstName
-        lastName
-        email
-        phone
-      }
-      billingAddress {
-        firstName
-        lastName
-        phone
-        email
-        address1
-        city
-        province
-        country
-        zip
-      }
-      shippingAddress {
-        firstName
-        lastName
-        phone
-        email
-        address1
-        city
-        province
-        country
-        zip
-      }
-      lineItems(first: 50) {
-        edges {
-          node {
-            id
-            title
-            quantity
-            variantTitle
-            sku
-            originalUnitPriceSet {
-              shopMoney {
-                amount
-                currencyCode
-              }
-            }
-            discountedUnitPriceSet {
-              shopMoney {
-                amount
-                currencyCode
-              }
-            }
-            product {
+        name
+        abandonedCheckoutUrl
+        createdAt
+        updatedAt
+        completedAt
+        note
+        customAttributes {
+          key
+          value
+        }
+        customer {
+          id
+          firstName
+          lastName
+          email
+          phone
+          displayName
+        }
+        billingAddress {
+          firstName
+          lastName
+          phone
+          address1
+          city
+          province
+          country
+          zip
+        }
+        shippingAddress {
+          firstName
+          lastName
+          phone
+          address1
+          city
+          province
+          country
+          zip
+        }
+        lineItems(first: 50) {
+          edges {
+            node {
               id
               title
-              handle
-            }
-            variant {
-              id
-              title
+              quantity
+              variantTitle
               sku
+              originalUnitPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              discountedUnitPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              product {
+                id
+                title
+                handle
+              }
+              variant {
+                id
+                title
+                sku
+              }
             }
           }
         }
-      }
-      subtotalPriceSet {
-        shopMoney {
-          amount
-          currencyCode
+        subtotalPriceSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
         }
-      }
-      totalTaxSet {
-        shopMoney {
-          amount
-          currencyCode
+        totalTaxSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
         }
-      }
-      totalPriceSet {
-        shopMoney {
-          amount
-          currencyCode
+        totalPriceSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
         }
-      }
-      discountCodes
-      totalDiscountSet {
-        shopMoney {
-          amount
-          currencyCode
+        discountCodes
+        totalDiscountSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
         }
+        taxesIncluded
       }
-      taxesIncluded
-      currencyCode
-      presentmentCurrencyCode
     }
   }
 `;
@@ -328,13 +322,14 @@ export async function fetchAbandonedCheckoutById(checkoutId) {
     
     const data = await executeGraphQLQuery(ABANDONED_CHECKOUT_BY_ID_QUERY, { id: graphqlId });
     
-    if (!data.abandonedCheckout) {
+    if (!data.abandonmentByAbandonedCheckoutId?.abandonedCheckout) {
       throw new Error(`Abandoned checkout not found: ${checkoutId}`);
     }
     
-    console.log(`✅ Found abandoned checkout: ${data.abandonedCheckout.name}`);
+    const checkout = data.abandonmentByAbandonedCheckoutId.abandonedCheckout;
+    console.log(`✅ Found abandoned checkout: ${checkout.name}`);
     
-    return data.abandonedCheckout;
+    return checkout;
     
   } catch (error) {
     console.error(`❌ Failed to fetch abandoned checkout ${checkoutId}:`, error.message);
