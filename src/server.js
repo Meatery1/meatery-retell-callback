@@ -771,7 +771,7 @@ app.post("/tools/send-discount", async (req, res) => {
     // Check eligibility first
     const eligibility = await checkAbandonedCheckoutDiscountEligibility(
       customer_email,
-      total_value || 100
+      params.total_value || 100
     );
 
     if (!eligibility.eligible) {
