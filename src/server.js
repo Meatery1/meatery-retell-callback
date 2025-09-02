@@ -806,9 +806,9 @@ app.post("/tools/send-discount", async (req, res) => {
     if (result.success) {
       res.json({
         success: true,
-        discount_code: result.discount.code,
+        discount_code: result.discountCode,
         message: result.summary,
-        speak: `Perfect! I've just emailed you a ${finalDiscountValue}% off discount code to use on your next order. You should receive it within a few minutes. The code is ${result.discount.code.split('').join(' ')} and it's good for 30 days.`
+        speak: `Perfect! I've just emailed you a ${finalDiscountValue}% off discount code to use on your next order. You should receive it within a few minutes. The code is ${result.discountCode.split('').join(' ')} and it's good for 30 days.`
       });
     } else {
       res.json({
