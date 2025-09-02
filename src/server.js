@@ -27,6 +27,17 @@ import {
 // Import the improvement system
 import { runImprovementLoop } from './prompt-improvement-loop.js';
 
+// Import centralized Retell configuration
+import { 
+  RETELL_AGENTS, 
+  RETELL_PHONE_NUMBERS, 
+  getAgentConfig, 
+  getAllAgents,
+  getAgentsByFunction,
+  refreshAgentDiscovery,
+  CURRENT_CONFIG
+} from './retell-config.js';
+
 dotenv.config();
 
 const app = express();
@@ -52,8 +63,9 @@ app.use(express.static("public"));
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const publicBaseUrl = process.env.PUBLIC_BASE_URL || ""; // e.g., https://your-ngrok-domain.ngrok.io
 
-// Default agent ID - always use this agent for all calls
-const DEFAULT_AGENT_ID = 'agent_2f7a3254099b872da193df3133';
+// Use centralized agent configuration instead of hardcoded IDs
+const DEFAULT_AGENT_ID = RETELL_AGENTS.DEFAULT; // Nick's post-delivery agent
+const GRACE_AGENT_ID = RETELL_AGENTS.GRACE_ABANDONED_CHECKOUT; // Grace's abandoned checkout agent
 
 // --- Data paths ---
 const __filename = fileURLToPath(import.meta.url);
@@ -255,8 +267,8 @@ async function placeConfirmationCall({ phone, customerName, orderNumber, agentId
   const result = await retell.call.createPhoneCall({
     // Required
     to_number: phone,
-    from_number: fromNumber || process.env.RETELL_FROM_NUMBER,
-    override_agent_id: DEFAULT_AGENT_ID, // Always use the default agent
+    from_number: fromNumber || RETELL_PHONE_NUMBERS.DEFAULT,
+    override_agent_id: agentId || DEFAULT_AGENT_ID, // Use provided agent or default
     // Optional runtime variables
     metadata: { source: "meatery-post-delivery", ...vars, ...(metadata || {}) },
     // Inject variables for prompt interpolation in Retell LLM / conversation flow
@@ -287,6 +299,61 @@ app.get("/agents", async (_req, res) => {
     const list = await retell.agent.list();
     res.json(list);
   } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// Get configured agents (from our dynamic configuration)
+app.get("/agents/configured", async (_req, res) => {
+  try {
+    const agents = getAllAgents();
+    res.json({
+      agents,
+      total: Object.keys(agents).length,
+      config: CURRENT_CONFIG
+    });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// Get agents by function type
+app.get("/agents/by-function/:functionType", async (req, res) => {
+  try {
+    const { functionType } = req.params;
+    const agents = getAgentsByFunction(functionType);
+    res.json({
+      functionType,
+      agents,
+      count: Object.keys(agents).length
+    });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
+// Refresh agent discovery from Retell API
+app.post("/agents/discover", async (_req, res) => {
+  try {
+    console.log('🔍 Refreshing agent discovery from Retell API...');
+    const result = await refreshAgentDiscovery();
+    
+    if (result.success) {
+      console.log(`✅ Agent discovery complete: ${result.discovered} discovered, ${result.total} total`);
+      res.json({
+        success: true,
+        message: `Discovered ${result.discovered} agents, ${result.total} total configured`,
+        ...result
+      });
+    } else {
+      console.error('❌ Agent discovery failed:', result.error);
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (e) {
+    console.error('❌ Agent discovery error:', e.message);
     res.status(500).json({ error: e?.response?.data || e.message });
   }
 });
@@ -1550,9 +1617,9 @@ async function placeAbandonedCheckoutCall({
     console.log(`Total: ${currency} ${totalPrice}\n`);
     
     const call = await retell.call.createPhoneCall({
-      from_number: process.env.RETELL_FROM_NUMBER || '+16198212984',
+      from_number: RETELL_PHONE_NUMBERS.GRACE_ABANDONED_CHECKOUT,
       to_number: toNumber,
-      override_agent_id: 'agent_e2636fcbe1c89a7f6bd0731e11', // Grace's agent ID
+      override_agent_id: GRACE_AGENT_ID, // Grace's agent ID
       
       // Dynamic variables for the abandoned checkout agent
       retell_llm_dynamic_variables: {

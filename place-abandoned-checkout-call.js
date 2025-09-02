@@ -1,14 +1,15 @@
 import { Retell } from 'retell-sdk';
 import { fetchAbandonedCheckouts, formatCheckoutForCall, checkCustomerHistory, checkDiscountEligibility } from './src/abandoned-checkout-service.js';
+import { RETELL_AGENTS, RETELL_PHONE_NUMBERS } from './src/retell-config.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 
-// Configuration
-const ABANDONED_CHECKOUT_AGENT_ID = 'agent_e2636fcbe1c89a7f6bd0731e11'; // Grace's agent ID
-const DEFAULT_FROM_NUMBER = process.env.RETELL_FROM_NUMBER || '+16198212984';
+// Configuration - Use centralized config
+const ABANDONED_CHECKOUT_AGENT_ID = RETELL_AGENTS.GRACE_ABANDONED_CHECKOUT;
+const DEFAULT_FROM_NUMBER = RETELL_PHONE_NUMBERS.GRACE_ABANDONED_CHECKOUT;
 
 /**
  * Place outbound call for abandoned checkout recovery
