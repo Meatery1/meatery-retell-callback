@@ -1,5 +1,6 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import { sendDiscountViaEvent } from './klaviyo-events-service.js';
 
 dotenv.config();
 
@@ -461,17 +462,16 @@ export async function sendKlaviyoDiscountSMS({
     });
     console.log('✅ Profile added to list');
 
-    // Step 4b: Verify the profile is actually in the list
+    // Step 4b: Verify the profile is actually in the list (best-effort)
     console.log('🔍 Verifying list membership...');
     let retries = 0;
     let membershipConfirmed = false;
-    
     while (retries < 5 && !membershipConfirmed) {
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds between checks
-      
+      await new Promise(resolve => setTimeout(resolve, 3000));
       try {
+        // Klaviyo list membership filters can be finicky; fall back to phone filter
         const listCheckResponse = await axios.get(
-          `https://a.klaviyo.com/api/lists/${listId}/profiles?filter=equals(id,"${profileId}")`,
+          `https://a.klaviyo.com/api/lists/${listId}/profiles?filter=equals(phone_number,"${formattedPhone}")`,
           {
             headers: {
               'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
@@ -479,8 +479,8 @@ export async function sendKlaviyoDiscountSMS({
             }
           }
         );
-        
-        if (listCheckResponse.data.data && listCheckResponse.data.data.length > 0) {
+        const rows = Array.isArray(listCheckResponse.data?.data) ? listCheckResponse.data.data : [];
+        if (rows.length > 0) {
           console.log('✅ List membership confirmed!');
           membershipConfirmed = true;
         } else {
@@ -488,14 +488,38 @@ export async function sendKlaviyoDiscountSMS({
           retries++;
         }
       } catch (checkError) {
-        console.log(`⚠️ Error checking list membership: ${checkError.message}`);
+        console.log(`⚠️ Error checking list membership: ${checkError.response?.status || ''} ${checkError.message}`);
         retries++;
       }
     }
-    
     if (!membershipConfirmed) {
       console.error('❌ Failed to confirm list membership after 15 seconds');
-      // Continue anyway - maybe it will work
+      // Fallback: trigger SMS via Events API to ensure delivery
+      try {
+        const eventResult = await sendDiscountViaEvent({
+          customerEmail: null,
+          customerPhone: formattedPhone,
+          customerName,
+          discountValue,
+          discountType,
+          discountCode,
+          recoveryUrl: formattedUrl,
+          abandonedCheckoutId: null,
+          channel: 'sms'
+        });
+        console.log('✅ Fallback event triggered for SMS');
+        return {
+          success: true,
+          campaignId: null,
+          to: customerPhone,
+          status: 'event_triggered',
+          platform: 'klaviyo-sms-event',
+          event: eventResult
+        };
+      } catch (eventErr) {
+        console.error('❌ Fallback event failed:', eventErr.response?.data || eventErr.message);
+        // Continue to attempt campaign anyway
+      }
     }
 
     // Step 5: Create campaign WITH campaign-messages in proper structure
