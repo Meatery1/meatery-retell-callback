@@ -925,7 +925,7 @@ app.post("/tools/send-discount", async (req, res) => {
       type: discount_type
     });
     
-    // Create and send the discount via SMS or email
+    // Create the discount and emit only a Klaviyo event (flows send delivery)
     const result = await createAndSendKlaviyoDiscount({
       customerEmail: trimmedEmail,
       customerName: finalCustomerName,
@@ -935,20 +935,18 @@ app.post("/tools/send-discount", async (req, res) => {
       reason: reason,
       orderNumber: finalOrderNumber,
       abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || callData?.retell_llm_dynamic_variables?.checkout_id || callData?.metadata?.checkout_id || null,
-      preferredChannel: preferredChannel // SMS first if phone available
+      preferredChannel: 'event'
     });
 
     if (result.success) {
-      // Dynamic response based on channel used
-      const channelMessage = preferredChannel === 'sms' 
-        ? `Perfect! I've just texted you a ${finalDiscountValue}% off discount code. You should get it on your phone in about 10 seconds.`
-        : `Perfect! I've just emailed you a ${finalDiscountValue}% off discount code. You should receive it within a few minutes.`;
+      // Unified response; delivery handled by Klaviyo flow
+      const channelMessage = `Perfect! I’ve published your ${finalDiscountValue}% off code and you’ll receive it shortly.`;
       
       res.json({
         success: true,
         discount_code: result.discountCode || result.discount?.code,
         message: result.summary,
-        channel_used: preferredChannel,
+        channel_used: (normalizedPhone ? 'sms' : 'email'),
         speak: `${channelMessage} The code is ${(result.discountCode || result.discount?.code || '').split('').join(' ')} and it's good for 30 days.`
       });
     } else {

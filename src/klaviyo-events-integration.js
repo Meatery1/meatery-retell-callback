@@ -121,31 +121,18 @@ export async function sendKlaviyoDiscountWithCheckout({
     url.searchParams.set('discount', discountCode);
     recoveryUrl = url.toString();
 
-    let result;
-    if (preferredChannel === 'sms' && customerPhone) {
-      console.log(`📱 Using SMS campaign API for immediate delivery to ${customerPhone}`);
-      result = await sendKlaviyoDiscountSMS({
-        customerPhone,
-        customerName,
-        discountValue,
-        discountType,
-        orderNumber: null,
-        discountCode,
-        recoveryUrl
-      });
-    } else {
-      result = await sendDiscountViaEvent({
-        customerEmail,
-        customerPhone,
-        customerName,
-        discountValue,
-        discountType,
-        discountCode,
-        recoveryUrl,
-        abandonedCheckoutId,
-        channel: preferredChannel
-      });
-    }
+    // Agent path: Always trigger Klaviyo event and let flows handle delivery
+    const result = await sendDiscountViaEvent({
+      customerEmail,
+      customerPhone,
+      customerName,
+      discountValue,
+      discountType,
+      discountCode,
+      recoveryUrl,
+      abandonedCheckoutId,
+      channel: customerPhone ? 'sms' : 'email'
+    });
     
     console.log(`✅ Discount sent successfully via ${preferredChannel}`);
     console.log(`   Discount code: ${discountCode}`);
@@ -157,9 +144,9 @@ export async function sendKlaviyoDiscountWithCheckout({
       recoveryUrl,
       cartTotal,
       cartItems,
-      channel: preferredChannel,
+      channel: customerPhone ? 'sms' : 'email',
       eventResult: result,
-      summary: `${discountType === 'percentage' ? discountValue + '%' : '$' + discountValue} discount code ${discountCode} sent via Klaviyo ${preferredChannel === 'sms' ? 'SMS Campaign' : 'Events API'}`
+      summary: `${discountType === 'percentage' ? discountValue + '%' : '$' + discountValue} discount code ${discountCode} published via Klaviyo Event (flow delivery)`
     };
     
   } catch (error) {
