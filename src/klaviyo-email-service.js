@@ -158,13 +158,23 @@ export async function createShopifyDiscountCode({
   }
 
   try {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    const phoneLast4 = String(customerPhone || (customer?.phone || "")).replace(/[^\d]/g, "").slice(-4) || null;
+    const baseCode = discountCode;
+    
+    for (let attempt = 0; attempt < 4; attempt++) {
       const result = await attemptCreate(discountCode);
       if (Array.isArray(result.userErrors) && result.userErrors.length > 0) {
         const msg = JSON.stringify(result.userErrors).toLowerCase();
-        if (msg.includes('taken') || msg.includes('already')) {
-          // If desired code collision, append 2 random digits and retry
-          discountCode = `${discountCode}${Math.floor(Math.random() * 90 + 10)}`;
+        const isDuplicate = msg.includes('taken') || msg.includes('already') || msg.includes('unique') || msg.includes('duplicate');
+        if (isDuplicate && attempt < 3) {
+          // Reset to base each time, then apply a smarter suffix strategy
+          if (attempt === 0 && phoneLast4) {
+            discountCode = `${baseCode}${phoneLast4}`;
+          } else if (attempt === 1) {
+            discountCode = `${baseCode}${Math.floor(Math.random() * 900 + 100)}`; // +3 digits
+          } else {
+            discountCode = `${baseCode}${Date.now().toString().slice(-2)}`; // +2 digits from time
+          }
           continue;
         }
         throw new Error(`Shopify user errors: ${JSON.stringify(result.userErrors)}`);
