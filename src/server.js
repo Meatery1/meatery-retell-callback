@@ -768,6 +768,12 @@ app.post("/tools/send-discount", async (req, res) => {
       });
     }
 
+    // Normalize phone number to E.164 format (add + if missing)
+    let normalizedPhone = customer_phone;
+    if (!normalizedPhone.startsWith('+')) {
+      normalizedPhone = '+' + normalizedPhone;
+    }
+
     // Check eligibility first
     const eligibility = await checkDiscountEligibility(
       customer_email,
@@ -791,13 +797,13 @@ app.post("/tools/send-discount", async (req, res) => {
     }
 
     // Determine preferred channel - PRIORITIZE SMS
-    const preferredChannel = customer_phone ? 'sms' : 'email';
+    const preferredChannel = normalizedPhone ? 'sms' : 'email';
     
     // Create and send the discount via SMS or email
     const result = await createAndSendKlaviyoDiscount({
       customerEmail: customer_email,
       customerName: customer_name || 'Valued Customer',
-      customerPhone: customer_phone,
+      customerPhone: normalizedPhone,
       discountType: discount_type,
       discountValue: finalDiscountValue,
       reason: reason,
