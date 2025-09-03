@@ -88,6 +88,9 @@ export async function createShopifyDiscountCode({
   let customer = null;
   if (customerEmail) customer = await getShopifyCustomerByEmail(customerEmail);
   if (!customer && customerPhone) customer = await getShopifyCustomerByPhone(customerPhone);
+  if (!customer) {
+    throw new Error('Customer not found by email or phone; refusing to create global discount');
+  }
   
   const mutation = `
     mutation createDiscountCode($input: DiscountCodeBasicInput!) {
@@ -125,12 +128,10 @@ export async function createShopifyDiscountCode({
         code: codeValue,
         startsAt: new Date().toISOString(),
         endsAt: expiresAt.toISOString(),
-        customerSelection: customer ? {
+        customerSelection: {
           customers: {
             add: [`gid://shopify/Customer/${customer.id}`]
           }
-        } : {
-          all: true
         },
         customerGets: {
           value,
