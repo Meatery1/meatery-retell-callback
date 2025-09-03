@@ -896,7 +896,7 @@ app.post("/tools/send-discount", async (req, res) => {
       discountValue: finalDiscountValue,
       reason: reason,
       orderNumber: finalOrderNumber,
-      abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || null,
+      abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || callData?.retell_llm_dynamic_variables?.checkout_id || callData?.metadata?.checkout_id || null,
       preferredChannel: preferredChannel // SMS first if phone available
     });
 

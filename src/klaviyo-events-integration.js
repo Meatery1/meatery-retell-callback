@@ -1,6 +1,6 @@
 import { sendDiscountViaEvent } from './klaviyo-events-service.js';
 import { sendKlaviyoDiscountSMS } from './klaviyo-email-service-fixed.js';
-import { fetchAbandonedCheckoutById } from './shopify-graphql-queries.js';
+import { fetchAbandonedCheckoutById, findLatestAbandonedCheckout } from './shopify-graphql-queries.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -38,7 +38,7 @@ export async function sendKlaviyoDiscountWithCheckout({
     // Generate discount code
     const discountCode = generateDiscountCode(orderNumber || 'GRACE');
     
-    // Fetch abandoned checkout URL if we have an ID
+    // Fetch abandoned checkout URL
     let recoveryUrl = null;
     let cartTotal = 0;
     let cartItems = [];
@@ -70,7 +70,16 @@ export async function sendKlaviyoDiscountWithCheckout({
       }
     }
     
-    // Fallback to generic checkout if no abandoned checkout URL
+    // If no checkoutId provided or lookup failed, try by contact info
+    if (!recoveryUrl) {
+      const byContact = await findLatestAbandonedCheckout({ email: customerEmail, phone: customerPhone });
+      if (byContact?.abandonedCheckoutUrl) {
+        recoveryUrl = byContact.abandonedCheckoutUrl;
+        console.log(`✅ Found abandoned checkout URL by contact: ${recoveryUrl}`);
+      }
+    }
+    
+    // Fallback to generic checkout if still no URL
     if (!recoveryUrl) {
       recoveryUrl = 'https://themeatery.com/checkout';
       console.log('📍 Using fallback checkout URL (no abandoned checkout found)');

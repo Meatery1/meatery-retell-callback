@@ -338,6 +338,57 @@ export async function fetchAbandonedCheckoutById(checkoutId) {
 }
 
 /**
+ * Find the latest abandoned checkout by contact info (email and/or phone)
+ * Returns the checkout node (including abandonedCheckoutUrl) or null
+ */
+export async function findLatestAbandonedCheckout({ email = null, phone = null } = {}) {
+  try {
+    const queries = [];
+    const sanitizedPhone = String(phone || "").replace(/[^\d]/g, "");
+    if (email) {
+      queries.push(`customer_email:${email}`);
+      queries.push(`email:${email}`);
+    }
+    if (sanitizedPhone) {
+      // Try full and last-10 digit matches
+      queries.push(`customer_phone:*${sanitizedPhone}*`);
+      if (sanitizedPhone.length >= 10) {
+        queries.push(`customer_phone:*${sanitizedPhone.slice(-10)}*`);
+      }
+    }
+    // Always have a final fallback to recent list if targeted queries fail
+    for (const q of queries) {
+      try {
+        const { checkouts } = await fetchAbandonedCheckoutsGraphQL({ first: 50, query: q });
+        if (Array.isArray(checkouts) && checkouts.length > 0) {
+          // Sort desc by createdAt and return first
+          const sorted = [...checkouts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          return sorted[0];
+        }
+      } catch (_) { /* try next */ }
+    }
+    // Fallback: recent 100 and filter by phone/email client-side
+    const recent = await fetchAbandonedCheckoutsGraphQL({ first: 100 });
+    const lowerEmail = String(email || "").toLowerCase();
+    const last10 = sanitizedPhone.length >= 10 ? sanitizedPhone.slice(-10) : null;
+    const candidates = (recent.checkouts || []).filter(c => {
+      const em = c?.customer?.email || c?.billingAddress?.email || "";
+      const ph = (c?.customer?.phone || c?.billingAddress?.phone || c?.shippingAddress?.phone || "").replace(/[^\d]/g, "");
+      const phLast10 = ph.length >= 10 ? ph.slice(-10) : null;
+      return (lowerEmail && String(em).toLowerCase() === lowerEmail) || (last10 && phLast10 === last10);
+    });
+    if (candidates.length > 0) {
+      const sorted = [...candidates].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      return sorted[0];
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ findLatestAbandonedCheckout error:', error.message);
+    return null;
+  }
+}
+
+/**
  * Get count of abandoned checkouts
  */
 export async function getAbandonedCheckoutsCount(query = null) {
