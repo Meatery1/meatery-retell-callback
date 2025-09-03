@@ -1,6 +1,7 @@
 import { sendDiscountViaEvent } from './klaviyo-events-service.js';
 import { sendKlaviyoDiscountSMS } from './klaviyo-email-service-fixed.js';
 import { fetchAbandonedCheckoutById, findLatestAbandonedCheckout } from './shopify-graphql-queries.js';
+import { createShopifyDiscountCode } from './klaviyo-email-service.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -8,10 +9,11 @@ dotenv.config();
 /**
  * Generate a unique discount code
  */
-function generateDiscountCode(prefix = 'GRACE') {
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-  return `${prefix}${timestamp}${random}`;
+function toCodeFromNameAndPercent(name, percent) {
+  const first = String(name || 'Guest').trim().split(/\s+/)[0] || 'Guest';
+  const cleanFirst = first.replace(/[^A-Za-z]/g, '').slice(0, 20) || 'Guest';
+  const pct = Math.max(1, Math.min(99, Number(percent) || 10));
+  return `${cleanFirst}${pct}`;
 }
 
 /**
@@ -35,8 +37,8 @@ export async function sendKlaviyoDiscountWithCheckout({
     console.log(`   customerPhone: ${customerPhone || 'NOT PROVIDED'}`);
     console.log(`   customerEmail: ${customerEmail || 'NOT PROVIDED'}`);
     
-    // Generate discount code
-    const discountCode = generateDiscountCode(orderNumber || 'GRACE');
+    // Build requested code like James12 based on provided customerName and discountValue
+    const desiredCode = toCodeFromNameAndPercent(customerName, discountValue);
     
     // Fetch abandoned checkout URL
     let recoveryUrl = null;
@@ -89,7 +91,7 @@ export async function sendKlaviyoDiscountWithCheckout({
     
     // Append discount code and UTM parameters to the recovery URL
     const url = new URL(recoveryUrl);
-    url.searchParams.set('discount', discountCode);
+    url.searchParams.set('discount', desiredCode);
     url.searchParams.set('utm_source', 'grace_ai');
     url.searchParams.set('utm_medium', preferredChannel);
     url.searchParams.set('utm_campaign', 'discount_recovery');
@@ -97,9 +99,29 @@ export async function sendKlaviyoDiscountWithCheckout({
     console.log(`🔗 Final recovery URL with discount: ${recoveryUrl}`);
     
     // Send via appropriate channel
+    // Create the Shopify discount with the desired code (handle collision with suffix)
+    let shopifyDiscount;
+    try {
+      shopifyDiscount = await createShopifyDiscountCode({
+        discountValue,
+        discountType,
+        customerEmail: customerEmail || customerPhone,
+        orderNumber,
+        code: desiredCode
+      });
+    } catch (e) {
+      console.error('❌ Failed to create desired discount code, aborting send:', e.message);
+      return { success: false, error: e.message, summary: 'Failed to create discount code' };
+    }
+
+    // Use the actually created code (may include suffix if collision)
+    const discountCode = shopifyDiscount.code;
+    // Ensure URL contains the actual created code
+    url.searchParams.set('discount', discountCode);
+    recoveryUrl = url.toString();
+
     let result;
     if (preferredChannel === 'sms' && customerPhone) {
-      // Use the SMS campaign API for immediate SMS delivery
       console.log(`📱 Using SMS campaign API for immediate delivery to ${customerPhone}`);
       result = await sendKlaviyoDiscountSMS({
         customerPhone,
@@ -111,7 +133,6 @@ export async function sendKlaviyoDiscountWithCheckout({
         recoveryUrl
       });
     } else {
-      // Use Events API for email or fallback
       result = await sendDiscountViaEvent({
         customerEmail,
         customerPhone,

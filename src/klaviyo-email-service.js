@@ -48,18 +48,19 @@ async function getShopifyCustomerByEmail(email) {
   }
 }
 
-async function createShopifyDiscountCode({
+export async function createShopifyDiscountCode({
   discountValue,
   discountType,
   customerEmail,
-  orderNumber = null
+  orderNumber = null,
+  code: desiredCode = null
 }) {
   const shopifyConfig = getShopifyConfig();
   if (!shopifyConfig.domain || !shopifyConfig.token) {
     throw new Error('Shopify configuration missing. Please set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN environment variables.');
   }
 
-  const discountCode = `GRACE${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  let discountCode = desiredCode || `GRACE${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 1); // 1 day expiration
 
@@ -90,71 +91,65 @@ async function createShopifyDiscountCode({
     }
   `;
 
-  const variables = {
-    input: {
-      title: `Grace Discount - ${customerEmail}`,
-      code: discountCode,
-      startsAt: new Date().toISOString(),
-      endsAt: expiresAt.toISOString(),
-      // Make discount customer-specific if customer exists, otherwise open to all
-      customerSelection: customer ? {
-        customers: {
-          add: [`gid://shopify/Customer/${customer.id}`]
-        }
-      } : {
-        all: true
-      },
-      customerGets: {
-        value: {
-          percentage: discountType === 'percentage' ? discountValue / 100 : 0,
-          fixedAmount: discountType === 'fixed_amount' ? {
-            amount: discountValue,
-            currencyCode: 'USD'
-          } : null
-        },
-        items: {
+  async function attemptCreate(codeValue) {
+    const variables = {
+      input: {
+        title: `Grace Discount - ${customerEmail}`,
+        code: codeValue,
+        startsAt: new Date().toISOString(),
+        endsAt: expiresAt.toISOString(),
+        customerSelection: customer ? {
+          customers: {
+            add: [`gid://shopify/Customer/${customer.id}`]
+          }
+        } : {
           all: true
         },
-        // Apply to both one-time purchases and first subscription order only
-        appliesOnSubscription: true,
-        appliesOnOneTimePurchase: true
-      },
-      minimumRequirement: {
-        quantity: {
-          greaterThanOrEqualToQuantity: "1"
-        }
-      },
-      usageLimit: 1,
-      appliesOncePerCustomer: true
-    }
-  };
-
-  try {
+        customerGets: {
+          value: {
+            percentage: discountType === 'percentage' ? discountValue / 100 : 0,
+            fixedAmount: discountType === 'fixed_amount' ? {
+              amount: discountValue,
+              currencyCode: 'USD'
+            } : null
+          },
+          items: { all: true },
+          appliesOnSubscription: true,
+          appliesOnOneTimePurchase: true
+        },
+        minimumRequirement: {
+          quantity: { greaterThanOrEqualToQuantity: "1" }
+        },
+        usageLimit: 1,
+        appliesOncePerCustomer: true
+      }
+    };
     const response = await axios.post(
       `https://${shopifyConfig.domain}/admin/api/2024-10/graphql.json`,
       { query: mutation, variables },
-      {
-        headers: {
-          'X-Shopify-Access-Token': shopifyConfig.token,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { 'X-Shopify-Access-Token': shopifyConfig.token, 'Content-Type': 'application/json' } }
     );
-
     if (response.data.errors) {
       throw new Error(`Shopify GraphQL errors: ${JSON.stringify(response.data.errors)}`);
     }
+    return response.data.data.discountCodeBasicCreate;
+  }
 
-    const result = response.data.data.discountCodeBasicCreate;
-    if (result.userErrors.length > 0) {
-      throw new Error(`Shopify user errors: ${JSON.stringify(result.userErrors)}`);
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const result = await attemptCreate(discountCode);
+      if (Array.isArray(result.userErrors) && result.userErrors.length > 0) {
+        const msg = JSON.stringify(result.userErrors).toLowerCase();
+        if (msg.includes('taken') || msg.includes('already')) {
+          // If desired code collision, append 2 random digits and retry
+          discountCode = `${discountCode}${Math.floor(Math.random() * 90 + 10)}`;
+          continue;
+        }
+        throw new Error(`Shopify user errors: ${JSON.stringify(result.userErrors)}`);
+      }
+      return { code: discountCode, id: result.codeDiscountNode.id, expiresAt: expiresAt.toISOString() };
     }
-
-    return {
-      code: discountCode,
-      id: result.codeDiscountNode.id,
-      expiresAt: expiresAt.toISOString()
-    };
+    throw new Error('Failed to create unique discount code after retries');
   } catch (error) {
     console.error('Error creating Shopify discount code:', error.response?.data || error.message);
     throw error;
