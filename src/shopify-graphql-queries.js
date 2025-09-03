@@ -130,8 +130,8 @@ const ABANDONED_CHECKOUTS_QUERY = `
  */
 const ABANDONED_CHECKOUT_BY_ID_QUERY = `
   query GetAbandonedCheckoutById($id: ID!) {
-    abandonmentByAbandonedCheckoutId(abandonedCheckoutId: $id) {
-      abandonedCheckout {
+    node(id: $id) {
+      ... on AbandonedCheckout {
         id
         name
         abandonedCheckoutUrl
@@ -321,12 +321,11 @@ export async function fetchAbandonedCheckoutById(checkoutId) {
     }
     
     const data = await executeGraphQLQuery(ABANDONED_CHECKOUT_BY_ID_QUERY, { id: graphqlId });
-    
-    if (!data.abandonmentByAbandonedCheckoutId?.abandonedCheckout) {
+
+    const checkout = data?.node;
+    if (!checkout) {
       throw new Error(`Abandoned checkout not found: ${checkoutId}`);
     }
-    
-    const checkout = data.abandonmentByAbandonedCheckoutId.abandonedCheckout;
     console.log(`✅ Found abandoned checkout: ${checkout.name}`);
     
     return checkout;
