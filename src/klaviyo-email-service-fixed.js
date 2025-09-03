@@ -389,35 +389,42 @@ export async function sendKlaviyoDiscountSMS({
     }
 
     // Step 2: Subscribe to SMS
-    await axios.post('https://a.klaviyo.com/api/profile-subscription-bulk-create-jobs/', {
-      data: {
-        type: 'profile-subscription-bulk-create-job',
-        attributes: {
-          profiles: {
-            data: [{
-              type: 'profile',
-              id: profileId,
-              attributes: {
-                phone_number: formattedPhone,
-                subscriptions: {
-                  sms: {
-                    marketing: {
-                      consent: 'SUBSCRIBED'
+    console.log(`📱 Subscribing ${formattedPhone} to SMS...`);
+    try {
+      await axios.post('https://a.klaviyo.com/api/profile-subscription-bulk-create-jobs/', {
+        data: {
+          type: 'profile-subscription-bulk-create-job',
+          attributes: {
+            profiles: {
+              data: [{
+                type: 'profile',
+                id: profileId,
+                attributes: {
+                  phone_number: formattedPhone,
+                  subscriptions: {
+                    sms: {
+                      marketing: {
+                        consent: 'SUBSCRIBED'
+                      }
                     }
                   }
                 }
-              }
-            }]
+              }]
+            }
           }
         }
-      }
-    }, {
-      headers: {
-        'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
-        'Content-Type': 'application/json',
-        'revision': '2024-10-15'
-      }
-    });
+      }, {
+        headers: {
+          'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
+          'Content-Type': 'application/json',
+          'revision': '2024-10-15'
+        }
+      });
+      console.log('✅ SMS subscription job created');
+    } catch (subError) {
+      console.error('⚠️ SMS subscription failed:', subError.response?.data || subError.message);
+      // Continue anyway - they might already be subscribed
+    }
 
     // Step 3: Create temporary list
     const listResponse = await axios.post('https://a.klaviyo.com/api/lists/', {
@@ -436,8 +443,10 @@ export async function sendKlaviyoDiscountSMS({
     });
 
     const listId = listResponse.data.data.id;
+    console.log(`📋 Created list: ${listId}`);
     
     // Step 4: Add profile to list BEFORE campaign creation
+    console.log(`📎 Adding profile ${profileId} to list ${listId}...`);
     await axios.post(`https://a.klaviyo.com/api/lists/${listId}/relationships/profiles/`, {
       data: [{
         type: 'profile',
@@ -450,9 +459,44 @@ export async function sendKlaviyoDiscountSMS({
         'revision': '2024-10-15'
       }
     });
+    console.log('✅ Profile added to list');
 
-    // Wait for subscription and list membership to propagate
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Step 4b: Verify the profile is actually in the list
+    console.log('🔍 Verifying list membership...');
+    let retries = 0;
+    let membershipConfirmed = false;
+    
+    while (retries < 5 && !membershipConfirmed) {
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds between checks
+      
+      try {
+        const listCheckResponse = await axios.get(
+          `https://a.klaviyo.com/api/lists/${listId}/profiles?filter=equals(id,"${profileId}")`,
+          {
+            headers: {
+              'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
+              'revision': '2024-10-15'
+            }
+          }
+        );
+        
+        if (listCheckResponse.data.data && listCheckResponse.data.data.length > 0) {
+          console.log('✅ List membership confirmed!');
+          membershipConfirmed = true;
+        } else {
+          console.log(`⏳ Retry ${retries + 1}: Profile not yet in list, waiting...`);
+          retries++;
+        }
+      } catch (checkError) {
+        console.log(`⚠️ Error checking list membership: ${checkError.message}`);
+        retries++;
+      }
+    }
+    
+    if (!membershipConfirmed) {
+      console.error('❌ Failed to confirm list membership after 15 seconds');
+      // Continue anyway - maybe it will work
+    }
 
     // Step 5: Create campaign WITH campaign-messages in proper structure
     const campaignResponse = await axios.post('https://a.klaviyo.com/api/campaigns/', {
@@ -499,8 +543,10 @@ export async function sendKlaviyoDiscountSMS({
     });
 
     const campaignId = campaignResponse.data.data.id;
+    console.log(`📨 Campaign created: ${campaignId}`);
 
     // Step 6: Trigger campaign send
+    console.log('🚀 Triggering campaign send...');
     await axios.post('https://a.klaviyo.com/api/campaign-send-jobs/', {
       data: {
         type: 'campaign-send-job',
