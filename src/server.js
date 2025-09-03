@@ -797,10 +797,54 @@ app.post("/tools/send-discount", async (req, res) => {
       } catch (_) { return null; }
     }
 
+    // Fallback parser: convert spelled-out numbers (e.g., "six-one-nine") to digits
+    function extractPhoneFromWords(text) {
+      try {
+        const wordToDigit = {
+          'zero': '0', 'oh': '0', 'o': '0',
+          'one': '1',
+          'two': '2', 'to': '2', 'too': '2',
+          'three': '3',
+          'four': '4', 'for': '4',
+          'five': '5',
+          'six': '6',
+          'seven': '7',
+          'eight': '8', 'ate': '8',
+          'nine': '9'
+        };
+        const cleaned = String(text || "")
+          .toLowerCase()
+          .replace(/[,.;:]/g, ' ')
+          .replace(/\(([^)]+)\)/g, ' $1 ')
+          .replace(/[^a-z0-9+\-\s]/g, ' ');
+        if (!cleaned) return null;
+        const tokens = cleaned.split(/\s+/);
+        let digits = '';
+        for (const raw of tokens) {
+          const parts = raw.split(/[-–—]/); // handle hyphenated like six-one-nine
+          for (const p of parts) {
+            if (/^\+?\d+$/.test(p)) {
+              digits += p.replace(/\D/g, '');
+            } else if (wordToDigit[p] !== undefined) {
+              digits += wordToDigit[p];
+            }
+          }
+        }
+        if (digits.length >= 10) {
+          return digits.length > 11 ? digits.slice(-11) : digits;
+        }
+        return null;
+      } catch (_) { return null; }
+    }
+
     // Consider additional sources Retell may provide
     const dynamicPhone = callData?.retell_llm_dynamic_variables?.customer_phone || callData?.retell_llm_dynamic_variables?.phone;
     const structuredPhone = callData?.analysis?.structured?.customer_phone || callData?.analysis?.custom_analysis_data?.customer_phone;
-    const transcriptPhone = extractPhoneFromText(callData?.transcript) || extractPhoneFromText(JSON.stringify(callData?.transcript_object || ""));
+    const transcriptPhone =
+      extractPhoneFromText(callData?.transcript) ||
+      extractPhoneFromText(JSON.stringify(callData?.transcript_object || "")) ||
+      extractPhoneFromWords(callData?.transcript) ||
+      extractPhoneFromWords(JSON.stringify(callData?.transcript_object || ""));
 
     // Use provided phone or fall back to multiple call-derived sources
     const finalCustomerPhone = customer_phone ||
@@ -818,17 +862,19 @@ app.post("/tools/send-discount", async (req, res) => {
     const finalOrderNumber = order_number || 
                             callData?.metadata?.order_number;
 
-    if (!finalCustomerPhone) {
-      console.error('❌ No customer phone found in request:', {
+    const trimmedEmail = (customer_email || '').trim() || null;
+    if (!finalCustomerPhone && !trimmedEmail) {
+      console.error('❌ No customer phone or email found in request:', {
         args_phone: customer_phone,
         metadata_phone: callData?.metadata?.customer_phone,
         call_phone: customerPhoneFromCall,
-        direction: callData?.direction
+        direction: callData?.direction,
+        customer_email
       });
       return res.status(400).json({ 
         success: false, 
-        error: "Customer phone number is required",
-        speak: "I need your phone number to send the discount code. Can you please provide it?"
+        error: "Customer phone or email is required",
+        speak: "I need your phone number or email to send the discount code. Could you share one of those?"
       });
     }
 
@@ -842,19 +888,11 @@ app.post("/tools/send-discount", async (req, res) => {
       // Fallback: just prefix +
       return `+${digits}`;
     }
-    const normalizedPhone = normalizeToE164(finalCustomerPhone);
-    if (!normalizedPhone) {
-      console.error('❌ Failed to normalize phone from inputs');
-      return res.status(400).json({ 
-        success: false, 
-        error: "Customer phone number is required",
-        speak: "I need your phone number to send the discount code. Can you please provide it?"
-      });
-    }
+    const normalizedPhone = finalCustomerPhone ? normalizeToE164(finalCustomerPhone) : null;
 
     // Check eligibility first
     const eligibility = await checkDiscountEligibility(
-      customer_email,
+      trimmedEmail,
       params.total_value || 100
     );
 
@@ -889,7 +927,7 @@ app.post("/tools/send-discount", async (req, res) => {
     
     // Create and send the discount via SMS or email
     const result = await createAndSendKlaviyoDiscount({
-      customerEmail: customer_email,
+      customerEmail: trimmedEmail,
       customerName: finalCustomerName,
       customerPhone: normalizedPhone,
       discountType: discount_type,

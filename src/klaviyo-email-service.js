@@ -24,7 +24,7 @@ function getShopifyConfig() {
 /**
  * Get Shopify customer ID by email
  */
-async function getShopifyCustomerByEmail(email) {
+export async function getShopifyCustomerByEmail(email) {
   const shopifyConfig = getShopifyConfig();
   
   try {
@@ -48,10 +48,30 @@ async function getShopifyCustomerByEmail(email) {
   }
 }
 
+export async function getShopifyCustomerByPhone(phoneRaw) {
+  const shopifyConfig = getShopifyConfig();
+  try {
+    const phone = String(phoneRaw || "").replace(/[^\d+]/g, "");
+    const response = await axios.get(
+      `https://${shopifyConfig.domain}/admin/api/2024-10/customers/search.json`,
+      {
+        headers: { 'X-Shopify-Access-Token': shopifyConfig.token },
+        params: { query: `phone:${phone}` }
+      }
+    );
+    const customers = response.data.customers || [];
+    return customers.length > 0 ? customers[0] : null;
+  } catch (error) {
+    console.error('Error finding customer by phone:', error.message);
+    return null;
+  }
+}
+
 export async function createShopifyDiscountCode({
   discountValue,
   discountType,
   customerEmail,
+  customerPhone = null,
   orderNumber = null,
   code: desiredCode = null
 }) {
@@ -64,8 +84,10 @@ export async function createShopifyDiscountCode({
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 1); // 1 day expiration
 
-  // Get customer ID for customer-specific discount
-  const customer = await getShopifyCustomerByEmail(customerEmail);
+  // Get customer ID for customer-specific discount via email or phone
+  let customer = null;
+  if (customerEmail) customer = await getShopifyCustomerByEmail(customerEmail);
+  if (!customer && customerPhone) customer = await getShopifyCustomerByPhone(customerPhone);
   
   const mutation = `
     mutation createDiscountCode($input: DiscountCodeBasicInput!) {

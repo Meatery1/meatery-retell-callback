@@ -105,7 +105,8 @@ export async function sendKlaviyoDiscountWithCheckout({
       shopifyDiscount = await createShopifyDiscountCode({
         discountValue,
         discountType,
-        customerEmail: customerEmail || customerPhone,
+        customerEmail,
+        customerPhone,
         orderNumber,
         code: desiredCode
       });
