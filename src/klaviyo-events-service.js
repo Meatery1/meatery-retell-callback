@@ -28,7 +28,7 @@ export async function sendDiscountViaEvent({
     : `$${discountValue}`;
 
   // Ensure discount code is appended to recovery URL
-  let finalRecoveryUrl = recoveryUrl || 'https://themeatery.com/checkout';
+  let finalRecoveryUrl = recoveryUrl || 'https://themeatery.com/';
   if (discountCode && !finalRecoveryUrl.includes(`discount=${discountCode}`)) {
     const url = new URL(finalRecoveryUrl);
     url.searchParams.set('discount', discountCode);

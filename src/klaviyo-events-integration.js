@@ -79,10 +79,10 @@ export async function sendKlaviyoDiscountWithCheckout({
       }
     }
     
-    // Fallback to generic checkout if still no URL
+    // Fallback to homepage if still no URL
     if (!recoveryUrl) {
-      recoveryUrl = 'https://themeatery.com/checkout';
-      console.log('📍 Using fallback checkout URL (no abandoned checkout found)');
+      recoveryUrl = 'https://themeatery.com/';
+      console.log('📍 Using fallback homepage URL (no abandoned checkout found)');
     } else {
       console.log(`✅ Using actual abandoned checkout URL: ${recoveryUrl}`);
     }

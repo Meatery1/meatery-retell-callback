@@ -16,7 +16,7 @@ function getKlaviyoApiKey() {
  */
 function formatCheckoutUrl(baseUrl, discountCode, channel = 'email') {
   if (!baseUrl) {
-    baseUrl = 'https://themeatery.com/checkout';
+    baseUrl = 'https://themeatery.com/';
   }
   
   // Check if URL already has discount parameter
