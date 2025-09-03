@@ -781,10 +781,35 @@ app.post("/tools/send-discount", async (req, res) => {
       reason = 'customer_service'
     } = params;
     
-    // Use provided phone or fall back to call context
-    const finalCustomerPhone = customer_phone || 
-                               callData?.metadata?.customer_phone || 
-                               customerPhoneFromCall;
+    // Helper: extract a likely phone number from free text (e.g., transcript)
+    function extractPhoneFromText(text) {
+      try {
+        const str = String(text || "");
+        if (!str) return null;
+        // Look for sequences that resemble phone numbers
+        const match = str.match(/\+?\d[\d\-\s().]{9,}\d/);
+        if (!match) return null;
+        const digits = match[0].replace(/[^\d]/g, "");
+        if (!digits) return null;
+        // Prefer last 10-11 digits (US default)
+        if (digits.length > 11) return digits.slice(-11);
+        return digits;
+      } catch (_) { return null; }
+    }
+
+    // Consider additional sources Retell may provide
+    const dynamicPhone = callData?.retell_llm_dynamic_variables?.customer_phone || callData?.retell_llm_dynamic_variables?.phone;
+    const structuredPhone = callData?.analysis?.structured?.customer_phone || callData?.analysis?.custom_analysis_data?.customer_phone;
+    const transcriptPhone = extractPhoneFromText(callData?.transcript) || extractPhoneFromText(JSON.stringify(callData?.transcript_object || ""));
+
+    // Use provided phone or fall back to multiple call-derived sources
+    const finalCustomerPhone = customer_phone ||
+                               params?.phone ||
+                               callData?.metadata?.customer_phone ||
+                               dynamicPhone ||
+                               structuredPhone ||
+                               customerPhoneFromCall ||
+                               transcriptPhone;
     
     const finalCustomerName = customer_name || 
                               callData?.metadata?.customer_name || 
@@ -807,10 +832,24 @@ app.post("/tools/send-discount", async (req, res) => {
       });
     }
 
-    // Normalize phone number to E.164 format (add + if missing)
-    let normalizedPhone = finalCustomerPhone;
-    if (!normalizedPhone.startsWith('+')) {
-      normalizedPhone = '+' + normalizedPhone;
+    // Normalize phone number to E.164 format with US default if needed
+    function normalizeToE164(raw) {
+      const digits = String(raw || "").replace(/[^\d]/g, "");
+      if (!digits) return null;
+      if (String(raw || "").startsWith('+')) return `+${digits}`;
+      if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+      if (digits.length === 10) return `+1${digits}`;
+      // Fallback: just prefix +
+      return `+${digits}`;
+    }
+    const normalizedPhone = normalizeToE164(finalCustomerPhone);
+    if (!normalizedPhone) {
+      console.error('❌ Failed to normalize phone from inputs');
+      return res.status(400).json({ 
+        success: false, 
+        error: "Customer phone number is required",
+        speak: "I need your phone number to send the discount code. Can you please provide it?"
+      });
     }
 
     // Check eligibility first
