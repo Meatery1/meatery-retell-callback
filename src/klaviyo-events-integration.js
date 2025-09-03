@@ -29,7 +29,11 @@ export async function sendKlaviyoDiscountWithCheckout({
   orderNumber = null
 }) {
   try {
-    console.log('📧 Sending discount via Klaviyo Events API...');
+    console.log('📧 Sending discount via Klaviyo...');
+    console.log(`   abandonedCheckoutId: ${abandonedCheckoutId || 'NOT PROVIDED'}`);
+    console.log(`   preferredChannel: ${preferredChannel}`);
+    console.log(`   customerPhone: ${customerPhone || 'NOT PROVIDED'}`);
+    console.log(`   customerEmail: ${customerEmail || 'NOT PROVIDED'}`);
     
     // Generate discount code
     const discountCode = generateDiscountCode(orderNumber || 'GRACE');
@@ -69,8 +73,19 @@ export async function sendKlaviyoDiscountWithCheckout({
     // Fallback to generic checkout if no abandoned checkout URL
     if (!recoveryUrl) {
       recoveryUrl = 'https://themeatery.com/checkout';
-      console.log('📍 Using fallback checkout URL');
+      console.log('📍 Using fallback checkout URL (no abandoned checkout found)');
+    } else {
+      console.log(`✅ Using actual abandoned checkout URL: ${recoveryUrl}`);
     }
+    
+    // Append discount code and UTM parameters to the recovery URL
+    const url = new URL(recoveryUrl);
+    url.searchParams.set('discount', discountCode);
+    url.searchParams.set('utm_source', 'grace_ai');
+    url.searchParams.set('utm_medium', preferredChannel);
+    url.searchParams.set('utm_campaign', 'discount_recovery');
+    recoveryUrl = url.toString();
+    console.log(`🔗 Final recovery URL with discount: ${recoveryUrl}`);
     
     // Send via appropriate channel
     let result;
