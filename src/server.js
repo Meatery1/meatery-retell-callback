@@ -1637,7 +1637,7 @@ app.post("/call/abandoned-checkout/single", async (req, res) => {
       return res.status(403).json({ error: "Outside calling window" });
     }
     
-    const { checkoutId, phone, customerName, itemsSummary, totalPrice, currency, email } = req.body;
+    const { checkoutId, phone, customerName, itemsSummary, most_expensive_item, totalPrice, currency, email } = req.body;
     
     if (!phone || !itemsSummary) {
       return res.status(400).json({ error: "Missing required fields: phone, itemsSummary" });
@@ -1648,6 +1648,7 @@ app.post("/call/abandoned-checkout/single", async (req, res) => {
       phone,
       customerName: customerName || 'there',
       itemsSummary,
+      most_expensive_item: most_expensive_item || 'your items',
       totalPrice: totalPrice || 0,
       currency: currency || 'USD',
       email
@@ -1734,6 +1735,7 @@ async function placeAbandonedCheckoutCall({
   phone,
   customerName,
   itemsSummary,
+  most_expensive_item,
   totalPrice,
   currency = 'USD',
   email = null
@@ -1767,6 +1769,7 @@ async function placeAbandonedCheckoutCall({
         call_direction: 'OUTBOUND',
         customer_name: customerName,
         items_summary: itemsSummary,
+        most_expensive_item: most_expensive_item || 'your items',
         total_price: totalPrice,
         currency: currency,
         checkout_id: checkoutId,

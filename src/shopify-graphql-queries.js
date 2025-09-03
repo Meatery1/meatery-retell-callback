@@ -426,12 +426,42 @@ export function formatAbandonedCheckoutForCall(checkout) {
                       checkout.shippingAddress?.firstName ||
                       'there';
   
-  // Format line items
-  const lineItems = checkout.lineItems.edges.map(edge => {
+  // Format line items and find most expensive
+  const lineItemsWithPrices = checkout.lineItems.edges.map(edge => {
     const item = edge.node;
-    return `${item.quantity}x ${item.title}${item.variantTitle ? ` (${item.variantTitle})` : ''}`;
+    const unitPrice = parseFloat(item.originalUnitPriceSet?.shopMoney?.amount || item.discountedUnitPriceSet?.shopMoney?.amount || 0);
+    const totalItemPrice = unitPrice * item.quantity;
+    
+    // Clean up product name for conversational speech
+    let conversationalName = item.title
+      .replace(/\|/g, '-') // Replace pipes with dashes
+      .replace(/\s+/g, ' ') // Clean up multiple spaces
+      .trim();
+    
+    // Add variant title if it exists and is different from main title
+    if (item.variantTitle && !conversationalName.includes(item.variantTitle)) {
+      conversationalName += ` (${item.variantTitle})`;
+    }
+    
+    return {
+      title: item.title,
+      variantTitle: item.variantTitle,
+      quantity: item.quantity,
+      unitPrice: unitPrice,
+      totalItemPrice: totalItemPrice,
+      displayName: conversationalName,
+      formatted: `${item.quantity}x ${item.title}${item.variantTitle ? ` (${item.variantTitle})` : ''}`
+    };
   });
   
+  // Find the most expensive item (by total price for that line item)
+  const mostExpensiveItem = lineItemsWithPrices.reduce((max, current) => 
+    (current.totalItemPrice > max.totalItemPrice) ? current : max, 
+    lineItemsWithPrices[0] || { displayName: 'your items' }
+  );
+  
+  // Format line items for summary
+  const lineItems = lineItemsWithPrices.map(item => item.formatted);
   const itemsSummary = lineItems.join(', ');
   
   // Get total price
@@ -445,6 +475,7 @@ export function formatAbandonedCheckoutForCall(checkout) {
     customer_name: customerName,
     customer_email: checkout.customer?.email || checkout.billingAddress?.email,
     items_summary: itemsSummary,
+    most_expensive_item: mostExpensiveItem.displayName, // Add most expensive item
     line_items: checkout.lineItems.edges.map(edge => edge.node),
     total_price: totalPrice,
     currency: currency,
