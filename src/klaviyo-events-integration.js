@@ -1,4 +1,5 @@
 import { sendDiscountViaEvent } from './klaviyo-events-service.js';
+import { sendKlaviyoDiscountSMS } from './klaviyo-email-service-fixed.js';
 import { fetchAbandonedCheckoutById } from './shopify-graphql-queries.js';
 import dotenv from 'dotenv';
 
@@ -71,20 +72,36 @@ export async function sendKlaviyoDiscountWithCheckout({
       console.log('📍 Using fallback checkout URL');
     }
     
-    // Send via Events API (this triggers Klaviyo Flows)
-    const result = await sendDiscountViaEvent({
-      customerEmail,
-      customerPhone,
-      customerName,
-      discountValue,
-      discountType,
-      discountCode,
-      recoveryUrl,
-      abandonedCheckoutId,
-      channel: preferredChannel
-    });
+    // Send via appropriate channel
+    let result;
+    if (preferredChannel === 'sms' && customerPhone) {
+      // Use the SMS campaign API for immediate SMS delivery
+      console.log(`📱 Using SMS campaign API for immediate delivery to ${customerPhone}`);
+      result = await sendKlaviyoDiscountSMS({
+        customerPhone,
+        customerName,
+        discountValue,
+        discountType,
+        orderNumber: null,
+        discountCode,
+        recoveryUrl
+      });
+    } else {
+      // Use Events API for email or fallback
+      result = await sendDiscountViaEvent({
+        customerEmail,
+        customerPhone,
+        customerName,
+        discountValue,
+        discountType,
+        discountCode,
+        recoveryUrl,
+        abandonedCheckoutId,
+        channel: preferredChannel
+      });
+    }
     
-    console.log(`✅ Discount event sent successfully via ${preferredChannel}`);
+    console.log(`✅ Discount sent successfully via ${preferredChannel}`);
     console.log(`   Discount code: ${discountCode}`);
     console.log(`   Recovery URL: ${recoveryUrl}`);
     
@@ -96,7 +113,7 @@ export async function sendKlaviyoDiscountWithCheckout({
       cartItems,
       channel: preferredChannel,
       eventResult: result,
-      summary: `${discountType === 'percentage' ? discountValue + '%' : '$' + discountValue} discount code ${discountCode} sent via Klaviyo Events API`
+      summary: `${discountType === 'percentage' ? discountValue + '%' : '$' + discountValue} discount code ${discountCode} sent via Klaviyo ${preferredChannel === 'sms' ? 'SMS Campaign' : 'Events API'}`
     };
     
   } catch (error) {
