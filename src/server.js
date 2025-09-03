@@ -790,25 +790,34 @@ app.post("/tools/send-discount", async (req, res) => {
       finalDiscountValue = 15;
     }
 
-    // Create and send the discount via email
-          const result = await createAndSendKlaviyoDiscount({
-        customerEmail: customer_email, // Only use email if it exists
-        customerName: customer_name || 'Valued Customer',
-        customerPhone: customer_phone,
-        discountType: discount_type,
-        discountValue: finalDiscountValue,
-        reason: reason,
-        orderNumber: order_number,
-        abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || null,
-        preferredChannel: customer_email ? 'email' : 'sms' // Use email if available, otherwise SMS
-      });
+    // Determine preferred channel - PRIORITIZE SMS
+    const preferredChannel = customer_phone ? 'sms' : 'email';
+    
+    // Create and send the discount via SMS or email
+    const result = await createAndSendKlaviyoDiscount({
+      customerEmail: customer_email,
+      customerName: customer_name || 'Valued Customer',
+      customerPhone: customer_phone,
+      discountType: discount_type,
+      discountValue: finalDiscountValue,
+      reason: reason,
+      orderNumber: order_number,
+      abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || null,
+      preferredChannel: preferredChannel // SMS first if phone available
+    });
 
     if (result.success) {
+      // Dynamic response based on channel used
+      const channelMessage = preferredChannel === 'sms' 
+        ? `Perfect! I've just texted you a ${finalDiscountValue}% off discount code. You should get it on your phone in about 10 seconds.`
+        : `Perfect! I've just emailed you a ${finalDiscountValue}% off discount code. You should receive it within a few minutes.`;
+      
       res.json({
         success: true,
-        discount_code: result.discountCode,
+        discount_code: result.discountCode || result.discount?.code,
         message: result.summary,
-        speak: `Perfect! I've just emailed you a ${finalDiscountValue}% off discount code to use on your next order. You should receive it within a few minutes. The code is ${result.discountCode.split('').join(' ')} and it's good for 30 days.`
+        channel_used: preferredChannel,
+        speak: `${channelMessage} The code is ${(result.discountCode || result.discount?.code || '').split('').join(' ')} and it's good for 30 days.`
       });
     } else {
       res.json({
