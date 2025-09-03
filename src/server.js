@@ -749,8 +749,28 @@ app.post("/call/batch", async (req, res) => {
 // --- Discount and SMS endpoints for Retell custom tools ---
 app.post("/tools/send-discount", async (req, res) => {
   try {
+    // Debug incoming request
+    console.log('📱 Send-discount request:', {
+      body: req.body,
+      args: req.body?.args,
+      call: req.body?.call
+    });
+
     // Retell sends params in body.args
     const params = req.body?.args || req.body || {};
+    
+    // Get the call context from Retell
+    const callData = req.body?.call || {};
+    
+    // Extract customer phone from call context if not provided in args
+    let customerPhoneFromCall = null;
+    if (callData?.direction === 'outbound') {
+      customerPhoneFromCall = callData?.to_number;  // Customer is the recipient
+    } else if (callData?.direction === 'inbound') {
+      customerPhoneFromCall = callData?.from_number;  // Customer is the caller
+    }
+    
+    // Try to get phone from multiple sources
     const { 
       customer_phone,
       customer_name,
@@ -760,16 +780,35 @@ app.post("/tools/send-discount", async (req, res) => {
       discount_value = 10,
       reason = 'customer_service'
     } = params;
+    
+    // Use provided phone or fall back to call context
+    const finalCustomerPhone = customer_phone || 
+                               callData?.metadata?.customer_phone || 
+                               customerPhoneFromCall;
+    
+    const finalCustomerName = customer_name || 
+                              callData?.metadata?.customer_name || 
+                              "Valued Customer";
+    
+    const finalOrderNumber = order_number || 
+                            callData?.metadata?.order_number;
 
-    if (!customer_phone) {
+    if (!finalCustomerPhone) {
+      console.error('❌ No customer phone found in request:', {
+        args_phone: customer_phone,
+        metadata_phone: callData?.metadata?.customer_phone,
+        call_phone: customerPhoneFromCall,
+        direction: callData?.direction
+      });
       return res.status(400).json({ 
         success: false, 
-        error: "Customer phone number is required" 
+        error: "Customer phone number is required",
+        speak: "I need your phone number to send the discount code. Can you please provide it?"
       });
     }
 
     // Normalize phone number to E.164 format (add + if missing)
-    let normalizedPhone = customer_phone;
+    let normalizedPhone = finalCustomerPhone;
     if (!normalizedPhone.startsWith('+')) {
       normalizedPhone = '+' + normalizedPhone;
     }
@@ -799,15 +838,25 @@ app.post("/tools/send-discount", async (req, res) => {
     // Determine preferred channel - PRIORITIZE SMS
     const preferredChannel = normalizedPhone ? 'sms' : 'email';
     
+    // Log the discount request details
+    console.log('💰 Creating discount:', {
+      phone: normalizedPhone,
+      name: finalCustomerName,
+      order: finalOrderNumber,
+      email: customer_email,
+      value: finalDiscountValue,
+      type: discount_type
+    });
+    
     // Create and send the discount via SMS or email
     const result = await createAndSendKlaviyoDiscount({
       customerEmail: customer_email,
-      customerName: customer_name || 'Valued Customer',
+      customerName: finalCustomerName,
       customerPhone: normalizedPhone,
       discountType: discount_type,
       discountValue: finalDiscountValue,
       reason: reason,
-      orderNumber: order_number,
+      orderNumber: finalOrderNumber,
       abandonedCheckoutId: req.body.abandoned_checkout_id || req.body.checkout_id || null,
       preferredChannel: preferredChannel // SMS first if phone available
     });

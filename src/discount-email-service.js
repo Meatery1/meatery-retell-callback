@@ -9,7 +9,32 @@ import crypto from 'crypto';
 import { initializeEmailService, transporter } from './email-service.js';
 
 /**
- * Create a discount code in Shopify
+ * Get Shopify customer ID by email
+ */
+async function getShopifyCustomerByEmail(email) {
+  try {
+    const response = await axios.get(
+      `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers/search.json`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN
+        },
+        params: {
+          query: `email:${email}`
+        }
+      }
+    );
+    
+    const customers = response.data.customers || [];
+    return customers.length > 0 ? customers[0] : null;
+  } catch (error) {
+    console.error('Error finding customer by email:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Create a customer-specific discount code in Shopify using GraphQL
  */
 export async function createShopifyDiscountCode({
   code,
@@ -27,74 +52,118 @@ export async function createShopifyDiscountCode({
       code = `MEATERY${value}OFF${randomSuffix}`;
     }
 
-    // Create price rule first
-    const priceRuleUrl = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/price_rules.json`;
+    // Get customer ID for customer-specific discount
+    const customer = customerEmail ? await getShopifyCustomerByEmail(customerEmail) : null;
     
-    const priceRuleData = {
-      price_rule: {
-        title: `Customer Service Discount - ${code}`,
-        target_type: "line_item",
-        target_selection: "all",
-        allocation_method: "across",
-        value_type: discountType === 'percentage' ? 'percentage' : 'fixed_amount',
-        value: discountType === 'percentage' ? `-${value}` : `-${value * 100}`, // Negative value for discount, cents for fixed
-        customer_selection: "all",
-        once_per_customer: true,
-        usage_limit: usageLimit,
-        starts_at: new Date().toISOString(),
-        ends_at: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+
+    const mutation = `
+      mutation createDiscountCode($input: DiscountCodeBasicInput!) {
+        discountCodeBasicCreate(basicCodeDiscount: $input) {
+          codeDiscountNode {
+            id
+            codeDiscount {
+              ... on DiscountCodeBasic {
+                title
+                codes(first: 1) {
+                  nodes {
+                    code
+                  }
+                }
+              }
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        title: `Customer Service Discount - ${customerEmail || 'General'}`,
+        code: code,
+        startsAt: new Date().toISOString(),
+        endsAt: expiresAt.toISOString(),
+        // Make discount customer-specific if customer exists
+        customerSelection: customer ? {
+          customers: {
+            add: [`gid://shopify/Customer/${customer.id}`]
+          }
+        } : {
+          all: true
+        },
+        customerGets: {
+          value: discountType === 'percentage' ? {
+            percentage: value / 100
+          } : {
+            fixedAmount: {
+              amount: value,
+              currencyCode: 'USD'
+            }
+          },
+          items: {
+            all: true
+          },
+          // Apply to both one-time purchases and first subscription order only
+          appliesOnSubscription: true,
+          appliesOnOneTimePurchase: true
+        },
+        minimumRequirement: minimumAmount ? {
+          subtotal: {
+            greaterThanOrEqualToSubtotal: {
+              amount: minimumAmount,
+              currencyCode: 'USD'
+            }
+          }
+        } : {
+          quantity: {
+            greaterThanOrEqualToQuantity: "1"
+          }
+        },
+        usageLimit: usageLimit,
+        appliesOncePerCustomer: true
       }
     };
 
-    // Add minimum purchase requirement if specified
-    if (minimumAmount) {
-      priceRuleData.price_rule.prerequisite_subtotal_range = {
-        greater_than_or_equal_to: String(minimumAmount)
-      };
+    const response = await axios.post(
+      `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/graphql.json`,
+      { query: mutation, variables },
+      {
+        headers: {
+          'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (response.data.errors) {
+      throw new Error(`Shopify GraphQL errors: ${JSON.stringify(response.data.errors)}`);
     }
 
-    // Create the price rule
-    const priceRuleResponse = await axios.post(priceRuleUrl, priceRuleData, {
-      headers: { 
-        'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const priceRuleId = priceRuleResponse.data.price_rule.id;
-
-    // Create discount code for the price rule
-    const discountCodeUrl = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/price_rules/${priceRuleId}/discount_codes.json`;
-    
-    const discountCodeData = {
-      discount_code: {
-        code: code
-      }
-    };
-
-    const discountCodeResponse = await axios.post(discountCodeUrl, discountCodeData, {
-      headers: { 
-        'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN,
-        'Content-Type': 'application/json'
-      }
-    });
+    const result = response.data.data.discountCodeBasicCreate;
+    if (result.userErrors.length > 0) {
+      throw new Error(`Shopify user errors: ${JSON.stringify(result.userErrors)}`);
+    }
 
     return {
       success: true,
       code: code,
-      discount_id: discountCodeResponse.data.discount_code.id,
-      price_rule_id: priceRuleId,
+      discount_id: result.codeDiscountNode.id,
       value: value,
       type: discountType,
-      expires_at: priceRuleData.price_rule.ends_at,
-      checkout_url: `https://${process.env.SHOPIFY_STORE_DOMAIN}/discount/${code}`
+      expires_at: expiresAt.toISOString(),
+      checkout_url: `https://${process.env.SHOPIFY_STORE_DOMAIN}/discount/${code}`,
+      customer_specific: !!customer
     };
 
   } catch (error) {
     console.error('Error creating Shopify discount:', error.response?.data || error.message);
     
     // If code already exists, generate a new one
-    if (error.response?.data?.errors?.base?.[0]?.includes('already been taken')) {
+    if (error.message.includes('already been taken') || error.message.includes('taken')) {
       return createShopifyDiscountCode({ 
         ...arguments[0], 
         code: null // Force regeneration

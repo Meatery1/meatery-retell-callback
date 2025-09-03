@@ -21,6 +21,33 @@ function getShopifyConfig() {
 /**
  * Create a Shopify discount code with 1-day expiration and UTM tracking
  */
+/**
+ * Get Shopify customer ID by email
+ */
+async function getShopifyCustomerByEmail(email) {
+  const shopifyConfig = getShopifyConfig();
+  
+  try {
+    const response = await axios.get(
+      `https://${shopifyConfig.domain}/admin/api/2024-10/customers/search.json`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': shopifyConfig.token
+        },
+        params: {
+          query: `email:${email}`
+        }
+      }
+    );
+    
+    const customers = response.data.customers || [];
+    return customers.length > 0 ? customers[0] : null;
+  } catch (error) {
+    console.error('Error finding customer by email:', error.message);
+    return null;
+  }
+}
+
 async function createShopifyDiscountCode({
   discountValue,
   discountType,
@@ -36,6 +63,9 @@ async function createShopifyDiscountCode({
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 1); // 1 day expiration
 
+  // Get customer ID for customer-specific discount
+  const customer = await getShopifyCustomerByEmail(customerEmail);
+  
   const mutation = `
     mutation createDiscountCode($input: DiscountCodeBasicInput!) {
       discountCodeBasicCreate(basicCodeDiscount: $input) {
@@ -66,16 +96,28 @@ async function createShopifyDiscountCode({
       code: discountCode,
       startsAt: new Date().toISOString(),
       endsAt: expiresAt.toISOString(),
-      customerSelection: {
+      // Make discount customer-specific if customer exists, otherwise open to all
+      customerSelection: customer ? {
+        customers: {
+          add: [`gid://shopify/Customer/${customer.id}`]
+        }
+      } : {
         all: true
       },
       customerGets: {
         value: {
-          percentage: discountType === 'percentage' ? discountValue / 100 : 0
+          percentage: discountType === 'percentage' ? discountValue / 100 : 0,
+          fixedAmount: discountType === 'fixed_amount' ? {
+            amount: discountValue,
+            currencyCode: 'USD'
+          } : null
         },
         items: {
           all: true
-        }
+        },
+        // Apply to both one-time purchases and first subscription order only
+        appliesOnSubscription: true,
+        appliesOnOneTimePurchase: true
       },
       minimumRequirement: {
         quantity: {
