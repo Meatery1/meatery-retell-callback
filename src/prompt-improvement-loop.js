@@ -20,8 +20,24 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Configuration
 const CONFIG = {
-  AGENT_ID: process.env.RETELL_AGENT_ID || 'agent_2f7a3254099b872da193df3133',
-  LLM_ID: process.env.RETELL_LLM_ID || 'llm_7eed186989d2fba11fa1f9395bc7',
+  // All three agents to analyze
+  AGENTS: [
+    {
+      id: 'agent_e2636fcbe1c89a7f6bd0731e11',
+      name: 'The Meatery Abandoned Checkout Recovery Specialist',
+      llm_id: 'llm_330631504f69f5507c481d3447bf'
+    },
+    {
+      id: 'agent_2020d704dcc0b7f8552cacd973',
+      name: 'Meatery Nick - Inbound Calls',
+      llm_id: 'llm_6f85ccc95ee753c590eff1bcd5e2'
+    },
+    {
+      id: 'agent_2f7a3254099b872da193df3133',
+      name: 'Meatery Nick - Outbound Calls',
+      llm_id: 'llm_7eed186989d2fba11fa1f9395bc7'
+    }
+  ],
   ANALYSIS_WINDOW_HOURS: 24, // Back to 24 hours for daily analysis
   MIN_CALLS_FOR_ANALYSIS: 1, // Reduced since we're only looking at 1 day
   IMPROVEMENT_MODEL: 'gpt-4o',
@@ -118,7 +134,7 @@ async function updateLastAnalysisTimestamp() {
 }
 
 /**
- * Fetch recent calls and analyze patterns
+ * Fetch recent calls and analyze patterns for all agents
  */
 async function fetchAndAnalyzeCalls() {
   // Get the timestamp of the last analysis to avoid re-analyzing calls
@@ -140,41 +156,75 @@ async function fetchAndAnalyzeCalls() {
   
   console.log(`🔍 Analysis window: ${analysisWindow.toFixed(1)} hours (since ${new Date(since).toLocaleString()})`);
   
-  // Get recent calls
-  let calls = await retell.call.list({
-    agent_id: CONFIG.AGENT_ID,
-    start_timestamp: since,
-    limit: 100
-  });
+  // Collect calls from all agents
+  let allCalls = [];
+  let totalCallsFound = 0;
   
-  console.log(`📞 Found ${calls.length} calls in analysis window`);
+  for (const agent of CONFIG.AGENTS) {
+    console.log(`📞 Fetching calls for ${agent.name}...`);
+    
+    try {
+      const agentCalls = await retell.call.list({
+        agent_id: agent.id,
+        start_timestamp: since,
+        limit: 100
+      });
+      
+      // Filter for phone calls only (exclude web calls)
+      const phoneCalls = agentCalls.filter(call => {
+        // Phone calls have from_number and to_number, web calls don't
+        return call.from_number && call.to_number;
+      });
+      
+      console.log(`   - Found ${agentCalls.length} total calls, ${phoneCalls.length} phone calls`);
+      
+      // Add agent info to each call
+      phoneCalls.forEach(call => {
+        call.agent_info = {
+          id: agent.id,
+          name: agent.name,
+          llm_id: agent.llm_id
+        };
+      });
+      
+      allCalls = allCalls.concat(phoneCalls);
+      totalCallsFound += agentCalls.length;
+      
+    } catch (error) {
+      console.warn(`⚠️  Error fetching calls for ${agent.name}:`, error.message);
+    }
+  }
   
-  // Check if we have enough new calls to analyze
-  if (calls.length < CONFIG.MIN_CALLS_FOR_ANALYSIS) {
-    console.log(`⚠️  Not enough new calls for analysis (${calls.length} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
-    console.log('💡 This usually means the system is working well or there are no new calls to analyze');
-    return { status: 'insufficient_new_data', calls_found: calls.length };
+  console.log(`📞 Found ${totalCallsFound} total calls, ${allCalls.length} phone calls in analysis window`);
+  
+  // Check if we have enough new phone calls to analyze
+  if (allCalls.length < CONFIG.MIN_CALLS_FOR_ANALYSIS) {
+    console.log(`⚠️  Not enough new phone calls for analysis (${allCalls.length} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
+    console.log('💡 This usually means the system is working well or there are no new phone calls to analyze');
+    return { status: 'insufficient_new_data', calls_found: allCalls.length, total_calls_found: totalCallsFound };
   }
   
   // Filter out adversarial calls
-  const originalCount = calls.length;
-  calls = filterAdversarialCalls(calls);
+  const originalCount = allCalls.length;
+  allCalls = filterAdversarialCalls(allCalls);
   
-  if (originalCount - calls.length > 5) {
-    console.warn(`⚠️  Filtered ${originalCount - calls.length} potentially adversarial calls`);
+  if (originalCount - allCalls.length > 5) {
+    console.warn(`⚠️  Filtered ${originalCount - allCalls.length} potentially adversarial calls`);
   }
   
   // Check for anomalies
-  const anomalies = detectAnomalies(calls);
+  const anomalies = detectAnomalies(allCalls);
   if (anomalies.length > 0) {
     console.error('🚨 Anomalies detected:', anomalies);
     console.log('Skipping automatic improvements due to suspicious activity');
     return null;
   }
 
-  // Categorize calls
+  // Categorize calls by agent
   const analysis = {
-    total: calls.length,
+    total: allCalls.length,
+    total_calls_found: totalCallsFound,
+    by_agent: {},
     successful: [],
     failed: [],
     voicemail: [],
@@ -183,17 +233,36 @@ async function fetchAndAnalyzeCalls() {
     unhandled_requests: []
   };
 
-  for (const call of calls) {
+  // Initialize agent-specific analysis
+  for (const agent of CONFIG.AGENTS) {
+    analysis.by_agent[agent.id] = {
+      name: agent.name,
+      total: 0,
+      successful: 0,
+      failed: 0,
+      voicemail: 0,
+      calls: []
+    };
+  }
+
+  for (const call of allCalls) {
+    const agentId = call.agent_info.id;
+    analysis.by_agent[agentId].total++;
+    analysis.by_agent[agentId].calls.push(call);
+    
     // Check if voicemail
     if (call.call_analysis?.in_voicemail) {
       analysis.voicemail.push(call);
+      analysis.by_agent[agentId].voicemail++;
     }
     
     // Check success
     if (call.call_analysis?.call_successful === false) {
       analysis.failed.push(call);
+      analysis.by_agent[agentId].failed++;
     } else {
       analysis.successful.push(call);
+      analysis.by_agent[agentId].successful++;
     }
 
     // Analyze transcript for patterns
@@ -219,6 +288,8 @@ async function fetchAndAnalyzeCalls() {
       if (transcript.match(pattern)) {
         analysis.unhandled_requests.push({
           call_id: call.call_id,
+          agent_id: agentId,
+          agent_name: call.agent_info.name,
           type,
           excerpt: extractContext(transcript, pattern),
           sentiment: call.call_analysis?.user_sentiment
@@ -231,6 +302,8 @@ async function fetchAndAnalyzeCalls() {
         call.call_analysis?.user_sentiment === 'very_dissatisfied') {
       analysis.edge_cases.push({
         call_id: call.call_id,
+        agent_id: agentId,
+        agent_name: call.agent_info.name,
         issue: extractIssueFromTranscript(transcript),
         resolution: call.call_analysis?.custom_analysis_data?.resolution_preference
       });
@@ -424,7 +497,7 @@ Format your response as a JSON object with:
 }
 
 /**
- * Apply improvements to the agent
+ * Apply improvements to all agents
  */
 async function applyImprovements(improvements, requireApproval = false) {
   // Validate improvements for safety
@@ -442,42 +515,63 @@ async function applyImprovements(improvements, requireApproval = false) {
     await requestHumanApproval(improvements);
   }
   
-  // Get current LLM configuration
-  const currentLLM = await retell.llm.retrieve(CONFIG.LLM_ID);
+  const updatedAgents = [];
   
-  // Build improved prompt
-  let improvedPrompt = currentLLM.general_prompt;
-  
-  // Add new sections
-  if (improvements.new_sections) {
-    for (const [section, content] of Object.entries(improvements.new_sections)) {
-      improvedPrompt += `\n\n${section.toUpperCase()}:\n${content}`;
+  // Apply improvements to each agent
+  for (const agent of CONFIG.AGENTS) {
+    try {
+      console.log(`🔄 Updating ${agent.name}...`);
+      
+      // Get current LLM configuration
+      const currentLLM = await retell.llm.retrieve(agent.llm_id);
+      
+      // Build improved prompt
+      let improvedPrompt = currentLLM.general_prompt;
+      
+      // Add new sections
+      if (improvements.new_sections) {
+        for (const [section, content] of Object.entries(improvements.new_sections)) {
+          improvedPrompt += `\n\n${section.toUpperCase()}:\n${content}`;
+        }
+      }
+      
+      // Ensure core behaviors are preserved
+      improvedPrompt = preserveCoreBehaviors(improvedPrompt);
+      
+      // Update the LLM
+      const updated = await retell.llm.update(agent.llm_id, {
+        general_prompt: improvedPrompt
+      });
+      
+      updatedAgents.push({
+        agent_id: agent.id,
+        agent_name: agent.name,
+        llm_id: agent.llm_id,
+        last_modified: updated.last_modification_timestamp
+      });
+      
+      console.log(`✅ ${agent.name} updated successfully`);
+      
+    } catch (error) {
+      console.error(`❌ Failed to update ${agent.name}:`, error.message);
     }
   }
   
-  // Ensure core behaviors are preserved
-  improvedPrompt = preserveCoreBehaviors(improvedPrompt);
-  
   // Log the improvement
-  await logImprovement(improvements, improvedPrompt);
+  await logImprovement(improvements, updatedAgents);
   
-  // Update the LLM
-  const updated = await retell.llm.update(CONFIG.LLM_ID, {
-    general_prompt: improvedPrompt
-  });
-  
-  return updated;
+  return updatedAgents;
 }
 
 /**
  * Log improvements for tracking
  */
-async function logImprovement(improvements, newPrompt) {
+async function logImprovement(improvements, updatedAgents) {
   const timestamp = new Date().toISOString();
   const logEntry = {
     timestamp,
     improvements,
-    new_prompt: newPrompt,
+    updated_agents: updatedAgents,
     version: Date.now()
   };
   
@@ -564,14 +658,26 @@ async function runImprovementLoop() {
       return { status: 'insufficient_data' };
     }
     
-    console.log(`✅ Analyzed ${analysis.total} calls`);
+    console.log(`✅ Analyzed ${analysis.total} phone calls (${analysis.total_calls_found} total calls found)`);
     console.log(`   - Success rate: ${((analysis.successful.length / analysis.total) * 100).toFixed(1)}%`);
     console.log(`   - Unhandled requests: ${analysis.unhandled_requests.length}`);
-    console.log(`   - Edge cases: ${analysis.edge_cases.length}\n`);
+    console.log(`   - Edge cases: ${analysis.edge_cases.length}`);
+    
+    // Show agent-specific breakdown
+    console.log('\n📊 Agent-specific breakdown:');
+    for (const agent of CONFIG.AGENTS) {
+      const agentData = analysis.by_agent[agent.id];
+      if (agentData.total > 0) {
+        const successRate = agentData.total > 0 ? ((agentData.successful / agentData.total) * 100).toFixed(1) : '0.0';
+        console.log(`   - ${agent.name}: ${agentData.total} calls, ${successRate}% success rate`);
+      }
+    }
+    console.log('');
     
     // Step 2: Generate improvements
     console.log('🤖 Generating prompt improvements...');
-    const currentLLM = await retell.llm.retrieve(CONFIG.LLM_ID);
+    // Use the first agent's LLM for generating improvements (they should all be similar)
+    const currentLLM = await retell.llm.retrieve(CONFIG.AGENTS[0].llm_id);
     const improvements = await generatePromptImprovements(analysis, currentLLM.general_prompt);
     
     console.log('📝 Suggested improvements:');
@@ -584,11 +690,14 @@ async function runImprovementLoop() {
     
     // Step 3: Apply improvements
     console.log('🚀 Applying improvements...');
-    const updated = await applyImprovements(improvements);
+    const updatedAgents = await applyImprovements(improvements);
     
-    console.log('✅ Agent prompt updated successfully!');
-    console.log(`   - LLM ID: ${CONFIG.LLM_ID}`);
-    console.log(`   - Last modified: ${new Date(updated.last_modification_timestamp).toISOString()}\n`);
+    console.log('✅ All agent prompts updated successfully!');
+    for (const agent of updatedAgents) {
+      console.log(`   - ${agent.agent_name}: ${agent.llm_id}`);
+      console.log(`     Last modified: ${new Date(agent.last_modified).toISOString()}`);
+    }
+    console.log('');
     
     // Step 4: Update the last analysis timestamp
     await updateLastAnalysisTimestamp();
@@ -600,13 +709,20 @@ async function runImprovementLoop() {
       const summaryData = {
         analysis_date: new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
         calls_analyzed: analysis.total,
+        total_calls_found: analysis.total_calls_found,
         success_rate: ((analysis.successful.length / analysis.total) * 100).toFixed(1),
         improvements_made: true,
         new_sections_added: improvements.new_sections || {},
         priority_fixes: improvements.priority_fixes || [],
         expected_improvement: improvements.expected_improvement || 'Unknown',
         next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
-        status: 'Improvements applied successfully'
+        status: 'Improvements applied successfully',
+        agent_breakdown: analysis.by_agent,
+        updated_agents: updatedAgents.map(agent => ({
+          name: agent.agent_name,
+          llm_id: agent.llm_id,
+          last_modified: new Date(agent.last_modified).toISOString()
+        }))
       };
       
       await sendDailyImprovementSummary(summaryData);
@@ -693,9 +809,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('🚀 Starting script execution...');
   console.log('Environment check:');
   console.log('- RETELL_API_KEY:', process.env.RETELL_API_KEY ? '✅ Set' : '❌ Missing');
-  console.log('- RETELL_AGENT_ID:', process.env.RETELL_AGENT_ID ? '✅ Set' : '❌ Missing');
-  console.log('- RETELL_LLM_ID:', process.env.RETELL_LLM_ID ? '✅ Set' : '❌ Missing');
   console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing');
+  console.log('\nAgents to analyze:');
+  for (const agent of CONFIG.AGENTS) {
+    console.log(`- ${agent.name}: ${agent.id}`);
+  }
   
   runImprovementLoop()
     .then(result => {

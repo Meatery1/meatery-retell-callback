@@ -92,6 +92,11 @@ export async function createShopifyDiscountCode({
   `;
 
   async function attemptCreate(codeValue) {
+    const value =
+      discountType === 'percentage'
+        ? { percentage: discountValue / 100 }
+        : { discountAmount: { amount: String(discountValue), appliesOnEachItem: false } };
+
     const variables = {
       input: {
         title: `Grace Discount - ${customerEmail}`,
@@ -106,13 +111,7 @@ export async function createShopifyDiscountCode({
           all: true
         },
         customerGets: {
-          value: {
-            percentage: discountType === 'percentage' ? discountValue / 100 : 0,
-            fixedAmount: discountType === 'fixed_amount' ? {
-              amount: discountValue,
-              currencyCode: 'USD'
-            } : null
-          },
+          value,
           items: { all: true },
           appliesOnSubscription: true,
           appliesOnOneTimePurchase: true

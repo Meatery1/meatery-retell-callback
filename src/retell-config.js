@@ -16,15 +16,15 @@ const KNOWN_AGENTS = {
     function: 'abandoned_checkout_recovery'
   },
   DEFAULT: {
-    agentId: 'agent_2f7a3254099b872da193df3133',
-    llmId: 'llm_7eed186989d2fba11fa1f9395bc7',
+    agentId: 'agent_e2636fcbe1c89a7f6bd0731e11',
+    llmId: 'llm_330631504f69f5507c481d3447bf',
     phoneNumber: '+16198212984',
     name: 'Nick - Post-Delivery Confirmation',
     function: 'post_delivery_confirmation'
   },
   INBOUND: {
     agentId: 'agent_2020d704dcc0b7f8552cacd973',
-    llmId: 'llm_7eed186989d2fba11fa1f9395bc7',
+    llmId: 'llm_330631504f69f5507c481d3447bf',
     phoneNumber: '+16198212984',
     name: 'Nick - Inbound Customer Service',
     function: 'inbound_customer_service'
