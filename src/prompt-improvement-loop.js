@@ -145,16 +145,22 @@ async function fetchAndAnalyzeCalls() {
   console.log(`📅 Current time: ${now.toLocaleString()}`);
   console.log(`⏱️  Time since last analysis: ${Math.round((now - lastAnalysis) / (1000 * 60 * 60))} hours`);
   
-  // Only analyze calls since the last analysis (minimum 1 hour, maximum 24 hours)
-  const minHours = 1; // Minimum 1 hour between analyses
-  const maxHours = 24; // Maximum 24 hours between analyses
-  
+  // Only analyze calls since the last analysis
   const hoursSinceLast = (now - lastAnalysis) / (1000 * 60 * 60);
-  const analysisWindow = Math.max(minHours, Math.min(maxHours, hoursSinceLast));
   
-  const since = Date.now() - (analysisWindow * 60 * 60 * 1000);
+  // Safety check: If it's been more than 7 days, only look at the last 7 days
+  // This prevents analyzing thousands of calls if the system was down for weeks
+  const maxLookbackHours = 7 * 24; // 7 days
+  let since = lastAnalysis.getTime();
   
-  console.log(`🔍 Analysis window: ${analysisWindow.toFixed(1)} hours (since ${new Date(since).toLocaleString()})`);
+  if (hoursSinceLast > maxLookbackHours) {
+    since = Date.now() - (maxLookbackHours * 60 * 60 * 1000);
+    console.log(`⚠️  Last analysis was ${hoursSinceLast.toFixed(1)} hours ago (>${maxLookbackHours} hours)`);
+    console.log(`🔒 For safety, limiting analysis to last ${maxLookbackHours} hours`);
+  }
+  
+  console.log(`🔍 Analysis window: ${Math.min(hoursSinceLast, maxLookbackHours).toFixed(1)} hours since last analysis`);
+  console.log(`🔍 Fetching calls since: ${new Date(since).toLocaleString()}`);
   
   // Collect calls from all agents
   let allCalls = [];
@@ -200,7 +206,8 @@ async function fetchAndAnalyzeCalls() {
   // Check if we have enough new phone calls to analyze
   if (allCalls.length < CONFIG.MIN_CALLS_FOR_ANALYSIS) {
     console.log(`⚠️  Not enough new phone calls for analysis (${allCalls.length} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
-    console.log('💡 This usually means the system is working well or there are no new phone calls to analyze');
+    console.log(`💡 Only analyzing calls since ${new Date(since).toLocaleString()}`);
+    console.log('💡 This means no new calls to analyze since last improvement, or system is working well');
     return { status: 'insufficient_new_data', calls_found: allCalls.length, total_calls_found: totalCallsFound };
   }
   
