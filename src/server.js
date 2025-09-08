@@ -9,7 +9,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
   createAndSendKlaviyoDiscount,
-  sendKlaviyoDiscountWithCheckout
+  sendKlaviyoDiscountWithCheckout,
+  createWinBackDraftOrder,
+  sendWinBackDraftOrderEvent,
+  getCustomerOrderHistory
 } from './klaviyo-events-integration.js';
 import {
   fetchAbandonedCheckouts,
@@ -982,6 +985,243 @@ app.post("/tools/check-discount-eligibility", async (req, res) => {
       eligible: true, // Default to eligible if check fails
       reason: 'default',
       error: error.message 
+    });
+  }
+});
+
+// --- Win-Back Draft Order endpoint for Retell custom tools ---
+app.post("/tools/send-winback-draft-order", async (req, res) => {
+  try {
+    console.log('🎯 Win-back draft order request:', {
+      body: req.body,
+      args: req.body?.args,
+      call: req.body?.call
+    });
+
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    
+    // Get the call context from Retell
+    const callData = req.body?.call || {};
+    
+    // Extract customer phone from call context if not provided in args
+    let customerPhoneFromCall = null;
+    if (callData?.direction === 'outbound') {
+      customerPhoneFromCall = callData?.to_number;  // Customer is the recipient
+    } else if (callData?.direction === 'inbound') {
+      customerPhoneFromCall = callData?.from_number;  // Customer is the caller
+    }
+    
+    // Try to get phone from multiple sources
+    const { 
+      customer_phone,
+      customer_name,
+      customer_email,
+      product_variants = [], // Array of variant IDs to include
+      discount_value = 20,
+      custom_message = "We miss you! Here's a special 20% off order just for you."
+    } = params;
+
+    // Determine phone number from various sources
+    const finalCustomerPhone = customer_phone || 
+                               customerPhoneFromCall || 
+                               callData?.retell_llm_dynamic_variables?.customer_phone ||
+                               callData?.metadata?.customer_phone;
+
+    const finalCustomerName = customer_name || 
+                             callData?.retell_llm_dynamic_variables?.customer_name || 
+                             callData?.metadata?.customer_name || 
+                             "Valued Customer";
+
+    const trimmedEmail = (customer_email || 
+                         callData?.retell_llm_dynamic_variables?.customer_email ||
+                         callData?.metadata?.customer_email || "").trim();
+
+    if (!finalCustomerPhone && !trimmedEmail) {
+      return res.json({
+        success: false,
+        error: "No customer contact information provided",
+        speak: "I need either a phone number or email address to create your draft order."
+      });
+    }
+
+    // Normalize phone number to E.164 format
+    const normalizedPhone = finalCustomerPhone ? normalizeToE164(finalCustomerPhone) : null;
+
+    console.log('🥩 Creating win-back draft order:', {
+      phone: normalizedPhone,
+      name: finalCustomerName,
+      email: trimmedEmail,
+      variants: product_variants,
+      discount: discount_value
+    });
+
+    // Create draft order with Shopify
+    const draftOrderResult = await createWinBackDraftOrder({
+      customerEmail: trimmedEmail,
+      customerPhone: normalizedPhone,
+      customerName: finalCustomerName,
+      productVariants: product_variants,
+      discountValue: discount_value
+    });
+
+    if (!draftOrderResult.success) {
+      return res.json({
+        success: false,
+        error: draftOrderResult.error,
+        speak: "I'm having trouble creating that draft order right now. Let me have someone from our team follow up with you directly."
+      });
+    }
+
+    // Send Klaviyo event to trigger SMS flow
+    const klaviyoResult = await sendWinBackDraftOrderEvent({
+      customerEmail: trimmedEmail,
+      customerPhone: normalizedPhone,
+      customerName: finalCustomerName,
+      draftOrderId: draftOrderResult.draftOrderId,
+      checkoutUrl: draftOrderResult.checkoutUrl,
+      discountValue: discount_value,
+      totalValue: draftOrderResult.totalValue
+    });
+
+    if (klaviyoResult.success) {
+      // Create personalized response based on whether we used their history
+      let speakMessage;
+      
+      if (draftOrderResult.orderContext?.usedHistory) {
+        const favoriteItems = draftOrderResult.orderContext.historyItems
+          .map(item => item.title.split(' ').slice(0, 2).join(' ')) // Shorten titles
+          .slice(0, 2) // Max 2 items to mention
+          .join(' and ');
+          
+        speakMessage = `Perfect! I looked at your order history and saw you love ${favoriteItems}, so I've created a special ${discount_value}% off order with those items. You'll receive an email invoice and a text with the checkout link in seconds!`;
+      } else {
+        speakMessage = `Perfect! I've created a special ${discount_value}% off order with some of our most popular items. You'll receive an email invoice and a text message with the direct checkout link in just a few seconds. The discount is already applied!`;
+      }
+      
+      res.json({
+        success: true,
+        draft_order_id: draftOrderResult.draftOrderId,
+        checkout_url: draftOrderResult.checkoutUrl,
+        total_value: draftOrderResult.totalValue,
+        order_context: draftOrderResult.orderContext,
+        message: draftOrderResult.summary,
+        speak: speakMessage
+      });
+    } else {
+      res.json({
+        success: false,
+        error: klaviyoResult.error,
+        speak: "I created your draft order but I'm having trouble sending the notification. Let me have someone follow up with you directly."
+      });
+    }
+
+  } catch (error) {
+    console.error('Error in /tools/send-winback-draft-order:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      speak: "I apologize, but I'm unable to create that draft order right now. I'll make sure someone from our team reaches out to you."
+    });
+  }
+});
+
+// --- Customer Order History Lookup for Retell agents ---
+app.post("/tools/get-customer-order-history", async (req, res) => {
+  try {
+    console.log('📋 Customer order history request:', {
+      body: req.body,
+      args: req.body?.args,
+      call: req.body?.call
+    });
+
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    
+    // Get the call context from Retell
+    const callData = req.body?.call || {};
+    
+    // Extract customer phone from call context
+    let customerPhoneFromCall = null;
+    if (callData?.direction === 'outbound') {
+      customerPhoneFromCall = callData?.to_number;  // Customer is the recipient
+    } else if (callData?.direction === 'inbound') {
+      customerPhoneFromCall = callData?.from_number;  // Customer is the caller
+    }
+    
+    const { 
+      customer_phone,
+      customer_email,
+      max_orders = 3
+    } = params;
+
+    // Get contact info from various sources
+    const finalCustomerPhone = customer_phone || 
+                               customerPhoneFromCall || 
+                               callData?.retell_llm_dynamic_variables?.customer_phone ||
+                               callData?.metadata?.customer_phone;
+
+    const finalCustomerEmail = customer_email || 
+                               callData?.retell_llm_dynamic_variables?.customer_email ||
+                               callData?.metadata?.customer_email;
+
+    if (!finalCustomerPhone && !finalCustomerEmail) {
+      return res.json({
+        success: false,
+        error: "No customer contact information provided",
+        speak: "I need a phone number or email to look up your order history."
+      });
+    }
+
+    console.log('📋 Looking up order history for:', {
+      phone: finalCustomerPhone,
+      email: finalCustomerEmail
+    });
+
+    // Get customer order history
+    const history = await getCustomerOrderHistory(finalCustomerPhone, finalCustomerEmail, max_orders);
+
+    if (!history.success || history.orderHistory.length === 0) {
+      return res.json({
+        success: false,
+        error: "No order history found",
+        speak: "I don't see any previous orders in our system. Would you like me to help you place your first order with us?"
+      });
+    }
+
+    // Format the response for conversational use
+    const lastOrder = history.orderHistory[0];
+    const itemNames = lastOrder.items
+      .slice(0, 3) // Mention max 3 items
+      .map(item => item.title.split(' ').slice(0, 3).join(' ')) // Shorten titles
+      .join(', ');
+
+    const totalSpent = history.orderHistory
+      .reduce((sum, order) => sum + parseFloat(order.total || 0), 0)
+      .toFixed(2);
+
+    // Calculate days since last order
+    const daysSince = Math.floor((new Date() - new Date(lastOrder.date)) / (1000 * 60 * 60 * 24));
+
+    res.json({
+      success: true,
+      order_history: history.orderHistory,
+      popular_items: history.popularItems,
+      last_order_date: history.lastOrderDate,
+      last_order_total: history.lastOrderTotal,
+      total_orders: history.totalOrders,
+      days_since_last_order: daysSince,
+      total_lifetime_spent: totalSpent,
+      message: `Found ${history.totalOrders} orders, last order ${daysSince} days ago`,
+      speak: `I see you've ordered with us ${history.totalOrders} time${history.totalOrders > 1 ? 's' : ''} - your last order was ${daysSince} days ago and included ${itemNames}. Did you enjoy ${history.totalOrders > 1 ? 'those items' : 'that order'}?`
+    });
+
+  } catch (error) {
+    console.error('Error in /tools/get-customer-order-history:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      speak: "I'm having trouble accessing your order history right now. Let me help you with a fresh order instead."
     });
   }
 });
