@@ -610,11 +610,11 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
               console.log(`📱 Sending discount SMS to ${customerPhone}...`);
               
               try {
-                // Cap discount at 15% maximum
-                let discountValue = structured.discount_value || 10;
-                if (discountValue > 15) {
-                  console.log(`⚠️ Capping webhook discount at 15% (was ${discountValue}%)`);
-                  discountValue = 15;
+                // Cap discount at 20% maximum
+                let discountValue = structured.discount_value || 20;
+                if (discountValue > 20) {
+                  console.log(`⚠️ Capping webhook discount at 20% (was ${discountValue}%)`);
+                  discountValue = 20;
                 }
                 
                         const discountResult = await createAndSendKlaviyoDiscount({
@@ -908,7 +908,7 @@ app.post("/tools/send-discount", async (req, res) => {
       customer_email,
       order_number,
       discount_type = 'percentage',
-      discount_value = 10,
+      discount_value = 20,
       reason = 'customer_service'
     } = params;
     
@@ -1027,11 +1027,11 @@ app.post("/tools/send-discount", async (req, res) => {
       });
     }
 
-    // Use suggested discount value if higher, but cap at 15%
+    // Use suggested discount value if higher, but cap at 20%
     let finalDiscountValue = eligibility.discount_value || discount_value;
-    if (finalDiscountValue > 15) {
-      console.log(`⚠️ Capping discount at 15% (was ${finalDiscountValue}%)`);
-      finalDiscountValue = 15;
+    if (finalDiscountValue > 20) {
+      console.log(`⚠️ Capping discount at 20% (was ${finalDiscountValue}%)`);
+      finalDiscountValue = 20;
     }
 
     // Determine preferred channel - PRIORITIZE SMS
