@@ -168,57 +168,159 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
     console.log(`📋 Fetching order history for phone: ${customerPhone}, email: ${customerEmail}`);
     
     const phone = String(customerPhone || "").replace(/[^\d+]/g, "");
-    const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(); // Last year
     
-    const url = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json`;
-    const params = {
-      status: "any",
-      financial_status: "paid",
-      updated_at_min: since,
-      limit: 50, // Get more orders to find matches
-      fields: "id,name,order_number,customer,phone,shipping_address,current_total_price,created_at,line_items,tags"
-    };
+    console.log(`🔍 Using GraphQL to find customer by phone: "${phone}" or email: "${customerEmail}"`);
+    
+    const shopifyGraphqlEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-07/graphql.json`;
+    const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN;
+    
+    if (!shopifyAccessToken || !process.env.SHOPIFY_STORE_DOMAIN) {
+      throw new Error('Shopify credentials not configured');
+    }
 
-    const response = await axios.get(url, {
-      headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN },
-      params
+    // For outbound calls: Prioritize PHONE search since that's what Grace has
+    let customerQuery = '';
+    let searchMethod = '';
+    
+    if (phone) {
+      // Primary: Search by phone number (what Grace has on outbound calls)
+      // Try multiple phone formats since Shopify can be picky
+      const phoneFormats = [
+        phone, // Original: +16194587071
+        phone.replace(/^\+1/, ''), // Without +1: 6194587071
+        phone.replace(/^\+/, ''), // Without +: 16194587071
+        `(${phone.slice(-10, -7)}) ${phone.slice(-7, -4)}-${phone.slice(-4)}` // Formatted: (619) 458-7071
+      ];
+      
+      customerQuery = phoneFormats.map(fmt => `phone:${fmt}`).join(' OR ');
+      searchMethod = 'phone (multiple formats)';
+    } else if (customerEmail) {
+      // Fallback: Search by email if phone not available
+      customerQuery = `email:${customerEmail}`;
+      searchMethod = 'email';
+    } else {
+      throw new Error('Need either phone or email to find customer');
+    }
+    
+    console.log(`🔍 Searching customers by ${searchMethod}: ${customerQuery}`);
+
+    const findCustomerGraphQL = `
+      query findCustomer($query: String!) {
+        customers(first: 10, query: $query) {
+          edges {
+            node {
+              id
+              firstName
+              lastName
+              email
+              phone
+              defaultPhoneNumber {
+                phoneNumber
+              }
+              numberOfOrders
+              amountSpent {
+                amount
+                currencyCode
+              }
+              orders(first: ${maxOrders}, sortKey: CREATED_AT, reverse: true) {
+                edges {
+                  node {
+                    id
+                    name
+                    createdAt
+                    currentTotalPriceSet {
+                      shopMoney {
+                        amount
+                        currencyCode
+                      }
+                    }
+                    lineItems(first: 20) {
+                      edges {
+                        node {
+                          title
+                          quantity
+                          variant {
+                            id
+                            title
+                            sku
+                            product {
+                              title
+                              vendor
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    console.log(`🔍 GraphQL Query: ${customerQuery}`);
+
+    const response = await fetch(shopifyGraphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyAccessToken
+      },
+      body: JSON.stringify({
+        query: findCustomerGraphQL,
+        variables: { query: customerQuery }
+      })
     });
 
-    const orders = response.data?.orders || [];
+    const data = await response.json();
     
-    // Find orders matching either phone or email
-    const matchingOrders = orders
-      .filter((order) => {
-        const orderPhone = (order.phone || order?.customer?.phone || order?.shipping_address?.phone || "").replace(/[^\d+]/g, "");
-        const orderEmail = order?.customer?.email || order?.email;
-        
-        // Match by phone (loose match on last 10 digits) or exact email match
-        const phoneMatch = phone && orderPhone && phone.endsWith(orderPhone.slice(-10));
-        const emailMatch = customerEmail && orderEmail && orderEmail.toLowerCase() === customerEmail.toLowerCase();
-        
-        return phoneMatch || emailMatch;
-      })
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, maxOrders);
+    if (data.errors) {
+      console.error('❌ GraphQL errors:', data.errors);
+      throw new Error(data.errors[0]?.message || 'GraphQL query failed');
+    }
 
-    console.log(`✅ Found ${matchingOrders.length} previous orders`);
+    const customers = data.data?.customers?.edges || [];
+    console.log(`🔍 Found ${customers.length} customers matching query`);
 
-    // Extract variant information from line items
-    const orderHistory = matchingOrders.map(order => ({
-      orderNumber: order.order_number,
-      orderName: order.name,
-      total: order.current_total_price,
-      date: order.created_at,
-      items: order.line_items.map(item => ({
-        variantId: item.variant_id ? `gid://shopify/ProductVariant/${item.variant_id}` : null,
-        productId: item.product_id ? `gid://shopify/Product/${item.product_id}` : null,
-        title: item.title,
-        vendor: item.vendor,
-        quantity: item.quantity,
-        price: item.price,
-        sku: item.sku
-      })).filter(item => item.variantId) // Only include items with valid variant IDs
-    }));
+    if (customers.length === 0) {
+      console.log(`❌ No customers found for query: ${customerQuery}`);
+      return {
+        success: false,
+        error: 'No customer found',
+        orderHistory: [],
+        allVariantIds: [],
+        popularItems: []
+      };
+    }
+
+    // Get the first (most relevant) customer
+    const customer = customers[0].node;
+    const customerOrders = customer.orders.edges;
+    
+    console.log(`✅ Found customer: ${customer.firstName} ${customer.lastName} with ${customerOrders.length} recent orders`);
+
+    // Extract variant information from GraphQL response
+    const orderHistory = customerOrders.map(orderEdge => {
+      const order = orderEdge.node;
+      return {
+        orderNumber: order.name.replace('#', ''), // Remove # from order name
+        orderName: order.name,
+        total: order.currentTotalPriceSet.shopMoney.amount,
+        date: order.createdAt,
+        items: order.lineItems.edges.map(lineItemEdge => {
+          const lineItem = lineItemEdge.node;
+          return {
+            variantId: lineItem.variant?.id || null,
+            title: lineItem.title,
+            vendor: lineItem.variant?.product?.vendor || 'Unknown',
+            quantity: lineItem.quantity,
+            sku: lineItem.variant?.sku || ''
+          };
+        }).filter(item => item.variantId) // Only include items with valid variant IDs
+      };
+    });
 
     // Get all unique variant IDs from their order history
     const allVariantIds = [];
@@ -238,19 +340,28 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
     const popularItems = Object.entries(itemFrequency)
       .sort((a, b) => b[1] - a[1])
       .map(([key, frequency]) => {
-        const variantId = key.split('_').slice(-1)[0];
-        const title = key.split('_').slice(0, -1).join('_');
+        const parts = key.split('_');
+        const variantId = parts[parts.length - 1];
+        const title = parts.slice(0, -1).join('_');
         return { variantId, title, frequency };
       });
 
     return {
       success: true,
+      customer: {
+        id: customer.id,
+        name: `${customer.firstName} ${customer.lastName}`,
+        email: customer.email,
+        phone: customer.phone,
+        numberOfOrders: customer.numberOfOrders,
+        amountSpent: customer.amountSpent.amount
+      },
       orderHistory,
       allVariantIds: [...new Set(allVariantIds)], // Remove duplicates
       popularItems: popularItems.slice(0, 5), // Top 5 most ordered
       lastOrderDate: orderHistory[0]?.date,
       lastOrderTotal: orderHistory[0]?.total,
-      totalOrders: matchingOrders.length
+      totalOrders: orderHistory.length
     };
 
   } catch (error) {
