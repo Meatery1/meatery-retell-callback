@@ -493,13 +493,33 @@
             const allAgents = await api('/agents');
             console.log('Loaded agents:', allAgents);
             
-            agents = allAgents.map(agent => ({
-              id: agent.agent_id,
-              name: agent.agent_name || agent.agent_id,
-              key: agent.agent_id
-            }));
+            // Filter to only show the latest published version of each agent
+            const agentMap = new Map();
             
-            console.log('Processed agents:', agents);
+            allAgents.forEach(agent => {
+              const key = agent.agent_id;
+              const isPublished = agent.is_published;
+              const lastModified = agent.last_modification_timestamp;
+              
+              // Only consider published agents
+              if (isPublished) {
+                if (!agentMap.has(key) || lastModified > agentMap.get(key).last_modification_timestamp) {
+                  agentMap.set(key, agent);
+                }
+              }
+            });
+            
+            // Convert to array and sort by agent name
+            agents = Array.from(agentMap.values())
+              .map(agent => ({
+                id: agent.agent_id,
+                name: agent.agent_name || agent.agent_id,
+                key: agent.agent_id,
+                lastModified: agent.last_modification_timestamp
+              }))
+              .sort((a, b) => a.name.localeCompare(b.name));
+            
+            console.log('Filtered to latest published agents:', agents);
           } catch (e) {
             console.error('Failed to load agents from API:', e);
             // Fallback to configured agents if API fails
