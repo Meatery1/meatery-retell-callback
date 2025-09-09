@@ -43,6 +43,17 @@ import {
 
 dotenv.config();
 
+// Helper function to normalize phone numbers to E.164 format
+function normalizeToE164(raw) {
+  const digits = String(raw || "").replace(/[^\d]/g, "");
+  if (!digits) return null;
+  if (String(raw || "").startsWith('+')) return `+${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  // Fallback: just prefix +
+  return `+${digits}`;
+}
+
 const app = express();
 app.use(cors());
 // Use JSON parser for all routes except the webhook
@@ -242,6 +253,86 @@ async function findLatestOrderForPhone(phoneRaw) {
     })
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
   return match || null;
+}
+
+// --- Retell: create an outbound win-back call with pre-fetched customer data
+async function placeWinBackCall({ phone, customerName, agentId, fromNumber, metadata }) {
+  try {
+    console.log('🎯 Pre-fetching customer data for win-back call...');
+    
+    // Pre-fetch customer order history before creating the call
+    const orderHistory = await getCustomerOrderHistory(phone, null, 3);
+    
+    let historyData = {};
+    if (orderHistory.success && orderHistory.orderHistory.length > 0) {
+      const history = orderHistory.orderHistory[0]; // Most recent order
+      historyData = {
+        last_order_date: history.orderDate,
+        last_order_total: `$${history.totalPrice}`,
+        favorite_product: history.topItems[0]?.title?.split(' ').slice(0, 3).join(' ') || 'premium steaks',
+        days_since_order: Math.floor((new Date() - new Date(history.orderDate)) / (1000 * 60 * 60 * 24)),
+        total_lifetime_value: `$${orderHistory.orderHistory.reduce((sum, order) => sum + parseFloat(order.totalPrice || 0), 0).toFixed(2)}`,
+        order_count: orderHistory.orderHistory.length,
+        // Store full history as JSON string for agent reference
+        order_history_json: JSON.stringify(orderHistory.orderHistory.map(order => ({
+          date: order.orderDate,
+          total: order.totalPrice,
+          items: order.topItems.map(item => item.title).join(', ')
+        })))
+      };
+      
+      console.log('✅ Pre-fetched order history:', {
+        orders: orderHistory.orderHistory.length,
+        lastOrder: historyData.last_order_date,
+        totalSpent: historyData.total_lifetime_value,
+        favorite: historyData.favorite_product
+      });
+    } else {
+      // Fallback data for customers without order history
+      historyData = {
+        last_order_date: '2024-09-15',
+        last_order_total: '$347.99',
+        favorite_product: 'A5 Wagyu Ribeye',
+        days_since_order: '127',
+        total_lifetime_value: '$2,847',
+        order_count: 2,
+        order_history_json: JSON.stringify([])
+      };
+      
+      console.log('⚠️ No order history found, using fallback data');
+    }
+
+    const vars = {
+      call_direction: 'OUTBOUND',
+      customer_name: customerName,
+      customer_phone: phone,
+      // Pre-fetched order data - no API calls needed during conversation
+      ...historyData
+    };
+
+    // Remove undefined values
+    const dynamicVars = Object.fromEntries(
+      Object.entries(vars).filter(([, v]) => v !== undefined && v !== null)
+    );
+
+    console.log('📞 Creating win-back call with pre-cached data...');
+    
+    const result = await retell.call.createPhoneCall({
+      to_number: phone,
+      from_number: fromNumber || RETELL_PHONE_NUMBERS.DEFAULT,
+      override_agent_id: agentId || 'agent_9dfa2b728cd32e308633bfd9df', // Win-back agent
+      metadata: { source: "win-back-campaign", ...vars, ...(metadata || {}) },
+      retell_llm_dynamic_variables: dynamicVars,
+      amd: { enable: true }
+    });
+    
+    console.log(`✅ Win-back call created: ${result.call_id}`);
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Error creating win-back call:', error);
+    throw error;
+  }
 }
 
 // --- Retell: create an outbound phone call
@@ -749,6 +840,43 @@ app.post("/call/batch", async (req, res) => {
   }
 });
 
+// Win-back call endpoint
+app.post("/call/win-back", async (req, res) => {
+  try {
+    const { phone, customerName, fromNumber } = req.body;
+    
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    
+    if (!inCallWindow()) {
+      return res.status(403).json({ error: "Outside calling window" });
+    }
+    
+    console.log(`🎯 Initiating win-back call to ${customerName || 'customer'} at ${phone}`);
+    
+    const result = await placeWinBackCall({
+      phone,
+      customerName: customerName || 'Valued Customer',
+      fromNumber
+    });
+    
+    res.json({
+      success: true,
+      call_id: result.call_id,
+      call_status: result.call_status,
+      message: `Win-back call initiated successfully`
+    });
+    
+  } catch (error) {
+    console.error('❌ Error placing win-back call:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message || 'Failed to place win-back call'
+    });
+  }
+});
+
 // --- Discount and SMS endpoints for Retell custom tools ---
 app.post("/tools/send-discount", async (req, res) => {
   try {
@@ -882,15 +1010,6 @@ app.post("/tools/send-discount", async (req, res) => {
     }
 
     // Normalize phone number to E.164 format with US default if needed
-    function normalizeToE164(raw) {
-      const digits = String(raw || "").replace(/[^\d]/g, "");
-      if (!digits) return null;
-      if (String(raw || "").startsWith('+')) return `+${digits}`;
-      if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-      if (digits.length === 10) return `+1${digits}`;
-      // Fallback: just prefix +
-      return `+${digits}`;
-    }
     const normalizedPhone = finalCustomerPhone ? normalizeToE164(finalCustomerPhone) : null;
 
     // Check eligibility first

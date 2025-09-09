@@ -344,6 +344,27 @@
           <button id="call" style="width: 100%;">🚀 Place Call</button>
         </div>
 
+        <!-- Win-Back Call Section -->
+        <div class="card">
+          <h3>🎯 Win-Back Call (Optimized)</h3>
+          <div class="form-row">
+            <label>Phone Number</label>
+            <input id="winbackPhone" placeholder="+16195551234" />
+          </div>
+          <div class="form-row">
+            <label>Customer Name</label>
+            <input id="winbackName" placeholder="Nick" />
+          </div>
+          <div class="form-row">
+            <label>From Number (optional)</label>
+            <input id="winbackFromNumber" placeholder="+16195551234" />
+          </div>
+          <button id="winbackCall" style="width: 100%;">🚀 Place Win-Back Call</button>
+          <p style="font-size: 12px; color: #666; margin-top: 8px;">
+            ⚡ Uses pre-fetched customer data for instant personalization
+          </p>
+        </div>
+
         <!-- Batch Calls Section -->
         <div class="card">
           <h3>📊 Batch Calls</h3>
@@ -498,6 +519,34 @@
             })
           });
           out.textContent = 'Call placed successfully!\n\n' + JSON.stringify(data, null, 2);
+        } catch (e) { 
+          out.textContent = 'Error: ' + e.message; 
+        }
+      };
+
+      // Win-back call
+      el('winbackCall').onclick = async () => {
+        const phone = el('winbackPhone').value;
+        const customerName = el('winbackName').value;
+        const fromNumber = el('winbackFromNumber').value;
+        
+        if (!phone) {
+          out.textContent = 'Error: Phone number is required';
+          return;
+        }
+        
+        out.textContent = `🎯 Initiating optimized win-back call to ${customerName || 'customer'} at ${phone}...\n\nPre-fetching order history and customer data...`;
+        
+        try {
+          const data = await api('/call/win-back', { 
+            method: 'POST', 
+            body: JSON.stringify({
+              phone: phone,
+              customerName: customerName || undefined,
+              fromNumber: fromNumber || undefined
+            })
+          });
+          out.textContent = `✅ Optimized win-back call placed successfully!\n\n` + JSON.stringify(data, null, 2) + '\n\n⚡ Customer data pre-fetched - conversation will flow smoothly without API delays!';
         } catch (e) { 
           out.textContent = 'Error: ' + e.message; 
         }
