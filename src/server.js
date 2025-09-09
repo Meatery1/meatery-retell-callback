@@ -1192,28 +1192,43 @@ app.post("/tools/get-customer-order-history", async (req, res) => {
     // Format the response for conversational use
     const lastOrder = history.orderHistory[0];
     const itemNames = lastOrder.items
-      .slice(0, 3) // Mention max 3 items
+      .slice(0, 2) // Mention max 2 items for cleaner speech
       .map(item => item.title.split(' ').slice(0, 3).join(' ')) // Shorten titles
-      .join(', ');
+      .join(' and ');
 
-    const totalSpent = history.orderHistory
+    const totalSpent = history.allOrderHistory
       .reduce((sum, order) => sum + parseFloat(order.total || 0), 0)
       .toFixed(2);
 
     // Calculate days since last order
     const daysSince = Math.floor((new Date() - new Date(lastOrder.date)) / (1000 * 60 * 60 * 24));
 
+    // Create personalized response with multiple profile handling
+    let speakMessage = '';
+    let customerNote = '';
+    
+    if (history.searchInfo.multipleProfiles) {
+      customerNote = `Found ${history.searchInfo.totalCandidates} profiles for this number - selected ${history.customer.name} (${history.customer.numberOfOrders} orders, $${history.customer.amountSpent} spent)`;
+      speakMessage = `I found your account - ${history.customer.name}. I see you've ordered ${history.totalOrders} times and spent $${totalSpent} with us. Your last order was ${daysSince} days ago and included ${itemNames}. Did you enjoy those?`;
+    } else {
+      speakMessage = `I see you've ordered with us ${history.totalOrders} time${history.totalOrders > 1 ? 's' : ''} - your last order was ${daysSince} days ago and included ${itemNames}. Did you enjoy ${history.totalOrders > 1 ? 'those items' : 'that order'}?`;
+    }
+
     res.json({
       success: true,
+      customer: history.customer,
+      search_info: history.searchInfo,
       order_history: history.orderHistory,
+      all_order_history: history.allOrderHistory, // Full history for agents
       popular_items: history.popularItems,
       last_order_date: history.lastOrderDate,
       last_order_total: history.lastOrderTotal,
       total_orders: history.totalOrders,
       days_since_last_order: daysSince,
       total_lifetime_spent: totalSpent,
-      message: `Found ${history.totalOrders} orders, last order ${daysSince} days ago`,
-      speak: `I see you've ordered with us ${history.totalOrders} time${history.totalOrders > 1 ? 's' : ''} - your last order was ${daysSince} days ago and included ${itemNames}. Did you enjoy ${history.totalOrders > 1 ? 'those items' : 'that order'}?`
+      customer_note: customerNote,
+      message: `Found ${history.customer.name} via ${history.searchInfo.method} - ${history.totalOrders} orders`,
+      speak: speakMessage
     });
 
   } catch (error) {

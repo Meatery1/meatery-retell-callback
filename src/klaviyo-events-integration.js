@@ -178,74 +178,62 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
       throw new Error('Shopify credentials not configured');
     }
 
-    // For outbound calls: Prioritize PHONE search since that's what Grace has
-    let customerQuery = '';
+    let customer = null;
     let searchMethod = '';
+
+    // Try to find customer using different methods
+    const customerCandidates = [];
     
     if (phone) {
-      // Primary: Search by phone number (what Grace has on outbound calls)
-      // Try multiple phone formats since Shopify can be picky
-      const phoneFormats = [
-        phone, // Original: +16194587071
-        phone.replace(/^\+1/, ''), // Without +1: 6194587071
-        phone.replace(/^\+/, ''), // Without +: 16194587071
-        `(${phone.slice(-10, -7)}) ${phone.slice(-7, -4)}-${phone.slice(-4)}` // Formatted: (619) 458-7071
-      ];
+      console.log(`🔍 Attempting phone search with: ${phone}`);
       
-      customerQuery = phoneFormats.map(fmt => `phone:${fmt}`).join(' OR ');
-      searchMethod = 'phone (multiple formats)';
-    } else if (customerEmail) {
-      // Fallback: Search by email if phone not available
-      customerQuery = `email:${customerEmail}`;
-      searchMethod = 'email';
-    } else {
-      throw new Error('Need either phone or email to find customer');
-    }
-    
-    console.log(`🔍 Searching customers by ${searchMethod}: ${customerQuery}`);
-
-    const findCustomerGraphQL = `
-      query findCustomer($query: String!) {
-        customers(first: 10, query: $query) {
-          edges {
-            node {
-              id
-              firstName
-              lastName
-              email
-              phone
-              defaultPhoneNumber {
-                phoneNumber
-              }
-              numberOfOrders
-              amountSpent {
-                amount
-                currencyCode
-              }
-              orders(first: ${maxOrders}, sortKey: CREATED_AT, reverse: true) {
-                edges {
-                  node {
-                    id
-                    name
-                    createdAt
-                    currentTotalPriceSet {
-                      shopMoney {
-                        amount
-                        currencyCode
+      // Method 1: Use customers query with phone search (can return multiple matches)
+      const phoneSearchGraphQL = `
+        query findByPhone($query: String!) {
+          customers(first: 20, query: $query) {
+            edges {
+              node {
+                id
+                firstName
+                lastName
+                email
+                phone
+                defaultPhoneNumber {
+                  phoneNumber
+                }
+                numberOfOrders
+                amountSpent {
+                  amount
+                  currencyCode
+                }
+                lastOrder {
+                  createdAt
+                }
+                orders(first: 50, sortKey: CREATED_AT, reverse: true) {
+                  edges {
+                    node {
+                      id
+                      name
+                      createdAt
+                      currentTotalPriceSet {
+                        shopMoney {
+                          amount
+                          currencyCode
+                        }
                       }
-                    }
-                    lineItems(first: 20) {
-                      edges {
-                        node {
-                          title
-                          quantity
-                          variant {
-                            id
+                      lineItems(first: 20) {
+                        edges {
+                          node {
                             title
-                            sku
-                            product {
+                            quantity
+                            variant {
+                              id
                               title
-                              vendor
+                              sku
+                              product {
+                                title
+                                vendor
+                              }
                             }
                           }
                         }
@@ -257,35 +245,172 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
             }
           }
         }
+      `;
+
+      // Try different phone formats to catch all possible matches
+      const phoneFormats = [
+        phone, // Original: +16194587071
+        phone.replace(/^\+1/, ''), // Without +1: 6194587071
+        phone.replace(/^\+/, ''), // Without +: 16194587071
+      ];
+
+      for (const phoneFormat of phoneFormats) {
+        console.log(`🔍 Searching for phone format: ${phoneFormat}`);
+        
+        const response = await fetch(shopifyGraphqlEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': shopifyAccessToken
+          },
+          body: JSON.stringify({
+            query: phoneSearchGraphQL,
+            variables: { query: `phone:${phoneFormat}` }
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.errors) {
+          console.log(`❌ GraphQL errors for phone ${phoneFormat}:`, data.errors);
+          continue;
+        }
+
+        const customers = data.data?.customers?.edges || [];
+        if (customers.length > 0) {
+          console.log(`✅ Found ${customers.length} customer(s) for phone ${phoneFormat}`);
+          customers.forEach(customerEdge => {
+            customerCandidates.push({
+              customer: customerEdge.node,
+              searchMethod: `phone (${phoneFormat})`,
+              phoneFormat: phoneFormat
+            });
+          });
+        }
       }
-    `;
 
-    console.log(`🔍 GraphQL Query: ${customerQuery}`);
-
-    const response = await fetch(shopifyGraphqlEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': shopifyAccessToken
-      },
-      body: JSON.stringify({
-        query: findCustomerGraphQL,
-        variables: { query: customerQuery }
-      })
-    });
-
-    const data = await response.json();
-    
-    if (data.errors) {
-      console.error('❌ GraphQL errors:', data.errors);
-      throw new Error(data.errors[0]?.message || 'GraphQL query failed');
+      console.log(`🔍 Total customer candidates found: ${customerCandidates.length}`);
+      
+      // If we found multiple candidates, pick the best one
+      if (customerCandidates.length > 1) {
+        console.log(`⚠️ Multiple customers found for phone ${phone}:`);
+        customerCandidates.forEach((candidate, index) => {
+          console.log(`  ${index + 1}. ${candidate.customer.firstName} ${candidate.customer.lastName} - ${candidate.customer.email} - ${candidate.customer.numberOfOrders} orders - $${candidate.customer.amountSpent.amount} spent`);
+        });
+        
+        // Prioritize by: 1) Most orders, 2) Highest spend, 3) Most recent activity
+        const bestCustomer = customerCandidates.sort((a, b) => {
+          // First: Most orders
+          if (a.customer.numberOfOrders !== b.customer.numberOfOrders) {
+            return b.customer.numberOfOrders - a.customer.numberOfOrders;
+          }
+          // Second: Highest lifetime spend
+          if (parseFloat(a.customer.amountSpent.amount) !== parseFloat(b.customer.amountSpent.amount)) {
+            return parseFloat(b.customer.amountSpent.amount) - parseFloat(a.customer.amountSpent.amount);
+          }
+          // Third: Most recent order
+          const aLastOrder = a.customer.lastOrder?.createdAt || '1970-01-01';
+          const bLastOrder = b.customer.lastOrder?.createdAt || '1970-01-01';
+          return new Date(bLastOrder) - new Date(aLastOrder);
+        })[0];
+        
+        customer = bestCustomer.customer;
+        searchMethod = `${bestCustomer.searchMethod} (best of ${customerCandidates.length} matches)`;
+        
+        console.log(`✅ Selected best customer: ${customer.firstName} ${customer.lastName} - ${customer.email} - ${customer.numberOfOrders} orders - $${customer.amountSpent.amount}`);
+        
+      } else if (customerCandidates.length === 1) {
+        customer = customerCandidates[0].customer;
+        searchMethod = customerCandidates[0].searchMethod;
+        console.log(`✅ Found single customer: ${customer.firstName} ${customer.lastName}`);
+      }
     }
 
-    const customers = data.data?.customers?.edges || [];
-    console.log(`🔍 Found ${customers.length} customers matching query`);
+    // Fallback: Try email search if phone didn't work and email is available
+    if (!customer && customerEmail) {
+      console.log(`🔍 Attempting email search with: ${customerEmail}`);
+      
+      const emailSearchGraphQL = `
+        query findByEmail($emailAddress: String!) {
+          customerByIdentifier(identifier: { emailAddress: $emailAddress }) {
+            id
+            firstName
+            lastName
+            email
+            phone
+            defaultPhoneNumber {
+              phoneNumber
+            }
+            numberOfOrders
+            amountSpent {
+              amount
+              currencyCode
+            }
+            lastOrder {
+              createdAt
+            }
+            orders(first: 50, sortKey: CREATED_AT, reverse: true) {
+              edges {
+                node {
+                  id
+                  name
+                  createdAt
+                  currentTotalPriceSet {
+                    shopMoney {
+                      amount
+                      currencyCode
+                    }
+                  }
+                  lineItems(first: 20) {
+                    edges {
+                      node {
+                        title
+                        quantity
+                        variant {
+                          id
+                          title
+                          sku
+                          product {
+                            title
+                            vendor
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
 
-    if (customers.length === 0) {
-      console.log(`❌ No customers found for query: ${customerQuery}`);
+      const response = await fetch(shopifyGraphqlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': shopifyAccessToken
+        },
+        body: JSON.stringify({
+          query: emailSearchGraphQL,
+          variables: { emailAddress: customerEmail }
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.errors) {
+        console.log(`❌ GraphQL errors for email:`, data.errors);
+      } else if (data.data?.customerByIdentifier) {
+        customer = data.data.customerByIdentifier;
+        searchMethod = `email (${customerEmail})`;
+        console.log(`✅ Found customer by email: ${customer.firstName} ${customer.lastName}`);
+      }
+    }
+
+    // Final check: if no customer found
+    if (!customer) {
+      console.log(`❌ No customer found for phone: ${phone}, email: ${customerEmail}`);
       return {
         success: false,
         error: 'No customer found',
@@ -295,11 +420,8 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
       };
     }
 
-    // Get the first (most relevant) customer
-    const customer = customers[0].node;
     const customerOrders = customer.orders.edges;
-    
-    console.log(`✅ Found customer: ${customer.firstName} ${customer.lastName} with ${customerOrders.length} recent orders`);
+    console.log(`✅ Found customer: ${customer.firstName} ${customer.lastName} via ${searchMethod} with ${customerOrders.length} recent orders`);
 
     // Extract variant information from GraphQL response
     const orderHistory = customerOrders.map(orderEdge => {
@@ -356,12 +478,19 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
         numberOfOrders: customer.numberOfOrders,
         amountSpent: customer.amountSpent.amount
       },
-      orderHistory,
+      searchInfo: {
+        method: searchMethod,
+        totalCandidates: customerCandidates.length,
+        multipleProfiles: customerCandidates.length > 1
+      },
+      orderHistory: orderHistory.slice(0, maxOrders), // Limit final return but process all 50
+      allOrderHistory: orderHistory, // Full history for analysis
       allVariantIds: [...new Set(allVariantIds)], // Remove duplicates
       popularItems: popularItems.slice(0, 5), // Top 5 most ordered
       lastOrderDate: orderHistory[0]?.date,
       lastOrderTotal: orderHistory[0]?.total,
-      totalOrders: orderHistory.length
+      totalOrders: orderHistory.length, // All orders found, not just returned
+      totalLifetimeValue: customer.amountSpent.amount
     };
 
   } catch (error) {
