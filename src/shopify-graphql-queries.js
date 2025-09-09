@@ -388,16 +388,98 @@ export async function findLatestAbandonedCheckout({ email = null, phone = null }
 }
 
 /**
- * GraphQL query to fetch customer orders and analyze reorder patterns
+ * GraphQL query to fetch customer orders by phone number using customerByIdentifier
+ * This is more reliable than searching orders by phone number
  */
-const CUSTOMER_ORDER_HISTORY_QUERY = `
-  query GetCustomerOrderHistory($first: Int!, $query: String) {
+const CUSTOMER_ORDER_HISTORY_BY_PHONE_QUERY = `
+  query GetCustomerOrdersByPhone($phoneNumber: String!, $maxOrders: Int!) {
+    customerByIdentifier(identifier: { phoneNumber: $phoneNumber }) {
+      id
+      firstName
+      lastName
+      displayName
+      numberOfOrders
+      amountSpent {
+        amount
+        currencyCode
+      }
+      orders(first: $maxOrders, sortKey: CREATED_AT, reverse: true) {
+        edges {
+          node {
+            id
+            name
+            createdAt
+            totalPriceSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+            lineItems(first: 100) {
+              edges {
+                node {
+                  id
+                  title
+                  quantity
+                  variantTitle
+                  sku
+                  originalUnitPriceSet {
+                    shopMoney {
+                      amount
+                      currencyCode
+                    }
+                  }
+                  product {
+                    id
+                    title
+                    handle
+                  }
+                  variant {
+                    id
+                    title
+                    sku
+                  }
+                }
+              }
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          hasPreviousPage
+          startCursor
+          endCursor
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Fallback GraphQL query to fetch orders by phone number using orders query
+ * Used when customerByIdentifier doesn't find a customer
+ */
+const ORDERS_BY_PHONE_QUERY = `
+  query GetOrdersByPhone($first: Int!, $query: String!) {
     orders(first: $first, query: $query, sortKey: CREATED_AT, reverse: true) {
       edges {
         node {
           id
           name
           createdAt
+          phone
+          email
+          customer {
+            id
+            firstName
+            lastName
+            displayName
+            numberOfOrders
+            amountSpent {
+              amount
+              currencyCode
+            }
+          }
           totalPriceSet {
             shopMoney {
               amount
@@ -457,33 +539,69 @@ export async function getCustomerFrequentlyReorderedItems(customerPhone, maxOrde
       throw new Error('Valid phone number required');
     }
     
-    // Search for orders by phone number
-    const searchQueries = [
-      `phone:*${cleanPhone}*`,
-      `phone:*${cleanPhone.slice(-10)}*`, // Last 10 digits
-      `customer_phone:*${cleanPhone}*`,
-      `shipping_address.phone:*${cleanPhone}*`,
-      `billing_address.phone:*${cleanPhone}*`
+    // Format phone number for Shopify (try different formats)
+    const phoneFormats = [
+      `+1${cleanPhone.slice(-10)}`, // +1 + last 10 digits
+      `+${cleanPhone}`, // + all digits
+      cleanPhone.slice(-10), // Last 10 digits only
+      cleanPhone // All digits
     ];
     
     let allOrders = [];
+    let customerData = null;
     
-    // Try different phone search patterns
-    for (const query of searchQueries) {
+    // First try to find customer by phone using customerByIdentifier
+    for (const phoneFormat of phoneFormats) {
       try {
-        const data = await executeGraphQLQuery(CUSTOMER_ORDER_HISTORY_QUERY, { 
-          first: maxOrders, 
-          query 
+        console.log(`🔍 Trying customerByIdentifier with phone: ${phoneFormat}`);
+        const data = await executeGraphQLQuery(CUSTOMER_ORDER_HISTORY_BY_PHONE_QUERY, { 
+          phoneNumber: phoneFormat,
+          maxOrders: maxOrders
         });
         
-        if (data.orders.edges.length > 0) {
-          allOrders = data.orders.edges.map(edge => edge.node);
-          console.log(`✅ Found ${allOrders.length} orders using query: ${query}`);
+        if (data.customerByIdentifier && data.customerByIdentifier.orders.edges.length > 0) {
+          allOrders = data.customerByIdentifier.orders.edges.map(edge => edge.node);
+          customerData = data.customerByIdentifier;
+          console.log(`✅ Found ${allOrders.length} orders using customerByIdentifier with phone: ${phoneFormat}`);
           break;
         }
       } catch (error) {
-        console.log(`   Query failed: ${query} - continuing...`);
+        console.log(`   customerByIdentifier failed for ${phoneFormat}: ${error.message}`);
         continue;
+      }
+    }
+    
+    // If customerByIdentifier didn't work, fall back to searching orders by phone
+    if (allOrders.length === 0) {
+      console.log(`🔄 Falling back to orders query with phone search`);
+      const searchQueries = [
+        `phone:*${cleanPhone}*`,
+        `phone:*${cleanPhone.slice(-10)}*`, // Last 10 digits
+        `customer_phone:*${cleanPhone}*`,
+        `shipping_address.phone:*${cleanPhone}*`,
+        `billing_address.phone:*${cleanPhone}*`
+      ];
+      
+      for (const query of searchQueries) {
+        try {
+          const data = await executeGraphQLQuery(ORDERS_BY_PHONE_QUERY, { 
+            first: maxOrders, 
+            query 
+          });
+          
+          if (data.orders.edges.length > 0) {
+            allOrders = data.orders.edges.map(edge => edge.node);
+            // Extract customer data from first order if available
+            if (allOrders[0]?.customer) {
+              customerData = allOrders[0].customer;
+            }
+            console.log(`✅ Found ${allOrders.length} orders using fallback query: ${query}`);
+            break;
+          }
+        } catch (error) {
+          console.log(`   Fallback query failed: ${query} - continuing...`);
+          continue;
+        }
       }
     }
     
@@ -508,8 +626,33 @@ export async function getCustomerFrequentlyReorderedItems(customerPhone, maxOrde
       const orderValue = parseFloat(order.totalPriceSet?.shopMoney?.amount || 0);
       totalSpent += orderValue;
       
+      // Ensure lineItems exists and has edges
+      if (!order.lineItems?.edges || !Array.isArray(order.lineItems.edges)) {
+        console.log(`⚠️ Skipping order ${order.name || order.id} with missing line items`);
+        return;
+      }
+      
       order.lineItems.edges.forEach(edge => {
+        // Ensure edge and node exist
+        if (!edge?.node) {
+          console.log(`⚠️ Skipping line item with missing node data`);
+          return;
+        }
+        
         const item = edge.node;
+        
+        // Skip items with missing product data (deleted products, etc.)
+        if (!item.product || !item.product.id) {
+          console.log(`⚠️ Skipping line item with missing product data: ${item.title || 'Unknown'}`);
+          return;
+        }
+        
+        // Skip items with missing essential data
+        if (!item.title || item.quantity === null || item.quantity === undefined) {
+          console.log(`⚠️ Skipping line item with missing essential data: ${item.title || 'Unknown'}`);
+          return;
+        }
+        
         const productId = item.product.id;
         const variantId = item.variant?.id;
         
@@ -524,10 +667,10 @@ export async function getCustomerFrequentlyReorderedItems(customerPhone, maxOrde
           };
           
           itemDetails[itemKey] = {
-            title: item.title,
-            variantTitle: item.variantTitle,
-            productHandle: item.product.handle,
-            sku: item.sku,
+            title: item.title || 'Unknown Product',
+            variantTitle: item.variantTitle || null,
+            productHandle: item.product?.handle || null,
+            sku: item.sku || null,
             lastPrice: parseFloat(item.originalUnitPriceSet?.shopMoney?.amount || 0)
           };
         }
