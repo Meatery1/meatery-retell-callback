@@ -513,7 +513,8 @@ export async function createWinBackDraftOrder({
   customerPhone, 
   customerName,
   productVariants = [], // Array of Shopify variant IDs
-  discountValue = 20
+  discountValue = 20,
+  targetAmount = 400 // Target order value before discount
 }) {
   try {
     console.log('🎯 Creating Shopify draft order for win-back...');
@@ -527,7 +528,7 @@ export async function createWinBackDraftOrder({
 
     // Smart product selection: prioritize customer history, fallback to safe popular items
     let variantsToUse = productVariants;
-    let orderContext = { usedHistory: false, historyItems: [] };
+    let orderContext = { usedHistory: false, historyItems: [], targetAmount };
     
     if (productVariants.length === 0) {
       console.log('📦 No specific variants provided, checking customer history...');
@@ -615,11 +616,121 @@ export async function createWinBackDraftOrder({
       };
     }
     
-    // Build line items for draft order
-    const lineItems = variantsToUse.map(variantId => ({
-      variantId: variantId.startsWith('gid://shopify') ? variantId : `gid://shopify/ProductVariant/${variantId}`,
-      quantity: 1
-    }));
+    // Build line items for draft order - target specific amount
+    let lineItems = [];
+    
+    if (variantsToUse.length > 0) {
+      // Get product details with prices to calculate quantities
+      const variantDetailsQuery = `
+        query getVariantDetails($ids: [ID!]!) {
+          nodes(ids: $ids) {
+            ... on ProductVariant {
+              id
+              price
+              title
+              product {
+                title
+              }
+              availableForSale
+            }
+          }
+        }
+      `;
+      
+      const variantIds = variantsToUse.map(id => 
+        id.startsWith('gid://shopify') ? id : `gid://shopify/ProductVariant/${id}`
+      );
+      
+      try {
+        const variantResponse = await fetch(shopifyGraphqlEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': shopifyAccessToken
+          },
+          body: JSON.stringify({
+            query: variantDetailsQuery,
+            variables: { ids: variantIds }
+          })
+        });
+        
+        const variantData = await variantResponse.json();
+        const variants = variantData.data?.nodes?.filter(node => node && node.availableForSale) || [];
+        
+        if (variants.length === 0) {
+          console.log('❌ No available variants found');
+          return {
+            success: false,
+            error: 'Selected products are not available for sale'
+          };
+        }
+        
+        // Smart quantity calculation to reach target amount
+        let currentTotal = 0;
+        const targetBeforeDiscount = targetAmount;
+        
+        console.log(`🎯 Building order to reach $${targetBeforeDiscount} (target: $${targetAmount})`);
+        
+        // Sort variants by price (ascending) for better distribution
+        variants.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+        
+        // Start with 1 of each item, then add more of the most expensive items to reach target
+        variants.forEach(variant => {
+          const price = parseFloat(variant.price);
+          lineItems.push({
+            variantId: variant.id,
+            quantity: 1
+          });
+          currentTotal += price;
+          console.log(`Added 1x ${variant.product.title} - ${variant.title} ($${price}) - Running total: $${currentTotal.toFixed(2)}`);
+        });
+        
+        // If we haven't reached target, add more of the higher-value items
+        if (currentTotal < targetBeforeDiscount && variants.length > 0) {
+          const remainingAmount = targetBeforeDiscount - currentTotal;
+          console.log(`🔄 Need $${remainingAmount.toFixed(2)} more to reach target`);
+          
+          // Add quantities of the most expensive items first
+          const expensiveVariants = [...variants].sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+          
+          for (const variant of expensiveVariants) {
+            const price = parseFloat(variant.price);
+            const additionalQuantity = Math.floor((targetBeforeDiscount - currentTotal) / price);
+            
+            if (additionalQuantity > 0) {
+              // Find existing line item and increase quantity
+              const existingItem = lineItems.find(item => item.variantId === variant.id);
+              if (existingItem) {
+                existingItem.quantity += additionalQuantity;
+                currentTotal += (price * additionalQuantity);
+                console.log(`Increased ${variant.product.title} to ${existingItem.quantity}x - Added $${(price * additionalQuantity).toFixed(2)} - Running total: $${currentTotal.toFixed(2)}`);
+              }
+              
+              if (currentTotal >= targetBeforeDiscount * 0.95) { // Within 5% of target
+                break;
+              }
+            }
+          }
+        }
+        
+        console.log(`✅ Final order total: $${currentTotal.toFixed(2)} (Target: $${targetBeforeDiscount})`);
+        orderContext.actualAmount = currentTotal;
+        
+      } catch (error) {
+        console.error('❌ Error fetching variant details:', error);
+        // Fallback to simple approach
+        lineItems = variantsToUse.map(variantId => ({
+          variantId: variantId.startsWith('gid://shopify') ? variantId : `gid://shopify/ProductVariant/${variantId}`,
+          quantity: 1
+        }));
+      }
+    } else {
+      // Fallback if no variants
+      lineItems = variantsToUse.map(variantId => ({
+        variantId: variantId.startsWith('gid://shopify') ? variantId : `gid://shopify/ProductVariant/${variantId}`,
+        quantity: 1
+      }));
+    }
 
     // Create draft order mutation
     const draftOrderMutation = `

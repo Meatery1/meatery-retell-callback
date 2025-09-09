@@ -675,10 +675,10 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
 
 // Simple in-memory test endpoint to place a single call
 app.post("/call", async (req, res) => {
-  const { phone, name, orderNumber, fromNumber, metadata } = req.body || {};
+  const { phone, name, orderNumber, agentId, fromNumber, metadata } = req.body || {};
   if (!phone) return res.status(400).json({ error: "phone required" });
   try {
-    const r = await placeConfirmationCall({ phone, customerName: name || "there", orderNumber, fromNumber, metadata });
+    const r = await placeConfirmationCall({ phone, customerName: name || "there", orderNumber, agentId, fromNumber, metadata });
     res.json(r);
   } catch (e) {
     res.status(500).json({ error: e?.response?.data || e.message });
@@ -1138,6 +1138,7 @@ app.post("/tools/send-winback-draft-order", async (req, res) => {
       customer_email,
       product_variants = [], // Array of variant IDs to include
       discount_value = 20,
+      target_amount = 400, // Target order amount before discount
       custom_message = "We miss you! Here's a special 20% off order just for you."
     } = params;
 
@@ -1181,7 +1182,8 @@ app.post("/tools/send-winback-draft-order", async (req, res) => {
       customerPhone: normalizedPhone,
       customerName: finalCustomerName,
       productVariants: product_variants,
-      discountValue: discount_value
+      discountValue: discount_value,
+      targetAmount: target_amount
     });
 
     if (!draftOrderResult.success) {

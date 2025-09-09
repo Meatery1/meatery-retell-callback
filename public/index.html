@@ -290,7 +290,15 @@
         <h3>⚡ Quick Test Calls</h3>
         
         <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: #f0f9ff; border-radius: 8px; border: 2px solid #0ea5e9;">
-          <strong>🤖 Using Default Agent: agent_e2636fcbe1c89a7f6bd0731e11</strong>
+          <div style="margin-bottom: 10px;">
+            <label for="agentSelect" style="display: inline-block; margin-right: 10px; color: #0369a1; font-weight: 600;">🤖 Select Agent:</label>
+            <select id="agentSelect" style="padding: 8px 12px; border: 2px solid #0ea5e9; border-radius: 6px; background: white; font-size: 0.95rem; min-width: 200px;">
+              <option value="agent_e2636fcbe1c89a7f6bd0731e11">Loading agents...</option>
+            </select>
+          </div>
+          <div id="agentInfo" style="font-size: 0.9rem; color: #0369a1;">
+            <strong>Current: Default Agent (agent_e2636fcbe1c89a7f6bd0731e11)</strong>
+          </div>
         </div>
         
         <div class="quick-call-buttons">
@@ -474,13 +482,102 @@
         return res.json();
       }
       
+      // Load agents and populate dropdown
+      async function loadAgents() {
+        try {
+          // Try to get configured agents first (includes names), fall back to all agents
+          let agents = [];
+          try {
+            const configuredResponse = await api('/agents/configured');
+            if (configuredResponse.agents) {
+              // Convert configured agents object to array
+              agents = Object.entries(configuredResponse.agents).map(([key, config]) => ({
+                id: config.agentId,
+                name: config.name || key,
+                key: key
+              }));
+            }
+          } catch (e) {
+            console.warn('Could not load configured agents, falling back to all agents:', e.message);
+          }
+          
+          // If no configured agents, fall back to all agents from Retell API
+          if (agents.length === 0) {
+            const allAgents = await api('/agents');
+            agents = allAgents.map(agent => ({
+              id: agent.agent_id,
+              name: agent.agent_name || agent.agent_id,
+              key: agent.agent_id
+            }));
+          }
+          
+          const select = el('agentSelect');
+          const agentInfo = el('agentInfo');
+          
+          // Clear existing options
+          select.innerHTML = '';
+          
+          // Add default option if no agents found
+          if (agents.length === 0) {
+            select.innerHTML = '<option value="agent_e2636fcbe1c89a7f6bd0731e11">Default Agent</option>';
+            agentInfo.innerHTML = '<strong>Current: Default Agent (agent_e2636fcbe1c89a7f6bd0731e11)</strong>';
+            return;
+          }
+          
+          // Populate dropdown with agents
+          agents.forEach(agent => {
+            const option = document.createElement('option');
+            option.value = agent.id;
+            option.textContent = agent.name;
+            select.appendChild(option);
+          });
+          
+          // Set default selection and update info
+          const defaultAgent = agents[0];
+          select.value = defaultAgent.id;
+          updateAgentInfo();
+          
+          // Add change listener
+          select.addEventListener('change', updateAgentInfo);
+          
+        } catch (e) {
+          console.error('Failed to load agents:', e);
+          const select = el('agentSelect');
+          const agentInfo = el('agentInfo');
+          select.innerHTML = '<option value="agent_e2636fcbe1c89a7f6bd0731e11">Default Agent (Error loading)</option>';
+          agentInfo.innerHTML = '<strong>⚠️ Error loading agents - using default</strong>';
+        }
+      }
+      
+      // Update agent info display
+      function updateAgentInfo() {
+        const select = el('agentSelect');
+        const agentInfo = el('agentInfo');
+        const selectedOption = select.options[select.selectedIndex];
+        
+        if (selectedOption) {
+          const agentName = selectedOption.textContent;
+          const agentId = selectedOption.value;
+          agentInfo.innerHTML = `<strong>Current: ${agentName} (${agentId.substring(0, 12)}...)</strong>`;
+        }
+      }
+      
+      // Get currently selected agent ID
+      function getSelectedAgentId() {
+        const select = el('agentSelect');
+        return select.value || 'agent_e2636fcbe1c89a7f6bd0731e11';
+      }
+      
 
       
       // Quick call function for team members
       async function quickCall(name, phone) {
-        const defaultAgent = 'agent_e2636fcbe1c89a7f6bd0731e11';
+        const selectedAgentId = getSelectedAgentId();
+        const select = el('agentSelect');
+        const selectedOption = select.options[select.selectedIndex];
+        const agentName = selectedOption ? selectedOption.textContent : 'Default Agent';
         
-        out.textContent = `Calling ${name} at ${phone} with default agent: ${defaultAgent.substring(0, 12)}...`;
+        out.textContent = `Calling ${name} at ${phone} with agent: ${agentName} (${selectedAgentId.substring(0, 12)}...)`;
         
         try {
           const data = await api('/call', { 
@@ -489,13 +586,15 @@
               phone: phone,
               name: name,
               orderNumber: 'TEST-' + Date.now(),
+              agentId: selectedAgentId, // Use selected agent
               metadata: {
                 test_call: true,
-                initiated_by: 'quick_call_button'
+                initiated_by: 'quick_call_button',
+                selected_agent_name: agentName
               }
             })
           });
-          out.textContent = `Call initiated to ${name}!\n\n` + JSON.stringify(data, null, 2);
+          out.textContent = `Call initiated to ${name} with ${agentName}!\n\n` + JSON.stringify(data, null, 2);
         } catch (e) { 
           out.textContent = `Failed to call ${name}: ${e.message}`; 
         }
@@ -680,8 +779,10 @@
       };
       
       // Initialize page on load
-      window.addEventListener('DOMContentLoaded', () => {
-        out.textContent = 'Ready for commands... Using default agent: agent_e2636fcbe1c89a7f6bd0731e11';
+      window.addEventListener('DOMContentLoaded', async () => {
+        out.textContent = 'Ready for commands... Loading agents...';
+        await loadAgents();
+        out.textContent = 'Ready for commands... Agents loaded successfully!';
       });
     </script>
   </body>
