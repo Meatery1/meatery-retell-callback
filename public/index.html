@@ -485,30 +485,36 @@
       // Load agents and populate dropdown
       async function loadAgents() {
         try {
-          // Try to get configured agents first (includes names), fall back to all agents
+          // Get all agents directly from Retell API (this gives us the real agent names)
           let agents = [];
-          try {
-            const configuredResponse = await api('/agents/configured');
-            if (configuredResponse.agents) {
-              // Convert configured agents object to array
-              agents = Object.entries(configuredResponse.agents).map(([key, config]) => ({
-                id: config.agentId,
-                name: config.name || key,
-                key: key
-              }));
-            }
-          } catch (e) {
-            console.warn('Could not load configured agents, falling back to all agents:', e.message);
-          }
           
-          // If no configured agents, fall back to all agents from Retell API
-          if (agents.length === 0) {
+          try {
+            console.log('Loading agents from Retell API...');
             const allAgents = await api('/agents');
+            console.log('Loaded agents:', allAgents);
+            
             agents = allAgents.map(agent => ({
               id: agent.agent_id,
               name: agent.agent_name || agent.agent_id,
               key: agent.agent_id
             }));
+            
+            console.log('Processed agents:', agents);
+          } catch (e) {
+            console.error('Failed to load agents from API:', e);
+            // Fallback to configured agents if API fails
+            try {
+              const configuredResponse = await api('/agents/configured');
+              if (configuredResponse.agents) {
+                agents = Object.entries(configuredResponse.agents).map(([key, config]) => ({
+                  id: config.agentId,
+                  name: config.name || key,
+                  key: key
+                }));
+              }
+            } catch (e2) {
+              console.warn('Could not load configured agents either:', e2.message);
+            }
           }
           
           const select = el('agentSelect');
@@ -545,7 +551,10 @@
           const select = el('agentSelect');
           const agentInfo = el('agentInfo');
           select.innerHTML = '<option value="agent_e2636fcbe1c89a7f6bd0731e11">Default Agent (Error loading)</option>';
-          agentInfo.innerHTML = '<strong>⚠️ Error loading agents - using default</strong>';
+          agentInfo.innerHTML = `<strong>⚠️ Error loading agents: ${e.message}</strong>`;
+          
+          // Show error in output console too
+          out.textContent = `Error loading agents: ${e.message}\n\nCheck browser console for details.`;
         }
       }
       
@@ -778,11 +787,16 @@
         }
       };
       
-      // Initialize page on load
+          // Initialize page on load
       window.addEventListener('DOMContentLoaded', async () => {
         out.textContent = 'Ready for commands... Loading agents...';
-        await loadAgents();
-        out.textContent = 'Ready for commands... Agents loaded successfully!';
+        try {
+          await loadAgents();
+          out.textContent = 'Ready for commands... Agents loaded successfully! Check dropdown above.';
+        } catch (e) {
+          out.textContent = `Ready for commands... Error loading agents: ${e.message}`;
+          console.error('Agent loading error:', e);
+        }
       });
     </script>
   </body>
