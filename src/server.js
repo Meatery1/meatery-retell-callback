@@ -21,6 +21,9 @@ import {
   checkDiscountEligibility
 } from './abandoned-checkout-service.js';
 import {
+  getCustomerFrequentlyReorderedItems
+} from './shopify-graphql-queries.js';
+import {
   initializeEmailService,
   sendRefundTicket,
   sendReplacementTicket,
@@ -1364,6 +1367,156 @@ app.post("/tools/get-customer-order-history", async (req, res) => {
       success: false,
       error: error.message,
       speak: "I'm having trouble accessing your order history right now. Let me help you with a fresh order instead."
+    });
+  }
+});
+
+// New endpoint for getting frequently reordered items with rich conversational data
+app.post("/tools/get-customer-reorder-patterns", async (req, res) => {
+  try {
+    console.log('🔄 Customer reorder patterns request:', {
+      body: req.body,
+      args: req.body?.args,
+      call: req.body?.call
+    });
+
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    
+    // Get the call context from Retell
+    const callData = req.body?.call || {};
+    
+    // Extract customer phone from call context
+    let customerPhoneFromCall = null;
+    if (callData?.direction === 'outbound') {
+      customerPhoneFromCall = callData?.to_number;  // Customer is the recipient
+    } else if (callData?.direction === 'inbound') {
+      customerPhoneFromCall = callData?.from_number;  // Customer is the caller
+    }
+    
+    const { 
+      customer_phone,
+      max_orders = 25 // Analyze more orders for better patterns
+    } = params;
+
+    // Get contact info from various sources
+    const finalCustomerPhone = customer_phone || 
+                               customerPhoneFromCall || 
+                               callData?.retell_llm_dynamic_variables?.customer_phone ||
+                               callData?.metadata?.customer_phone;
+
+    if (!finalCustomerPhone) {
+      return res.json({
+        success: false,
+        error: "No customer phone provided",
+        speak: "I need a phone number to analyze your ordering patterns."
+      });
+    }
+
+    console.log('🔄 Analyzing reorder patterns for:', finalCustomerPhone);
+
+    // Get comprehensive reorder analysis
+    const reorderData = await getCustomerFrequentlyReorderedItems(finalCustomerPhone, max_orders);
+
+    if (reorderData.totalOrders === 0) {
+      return res.json({
+        success: false,
+        error: "No order history found",
+        speak: "I don't see any previous orders to analyze patterns from."
+      });
+    }
+
+    // Create conversational insights based on reorder patterns
+    let conversationalInsights = [];
+    let loyaltyItems = [];
+    let diversityScore = 'varied'; // varied, consistent, or adventurous
+
+    if (reorderData.frequentlyReorderedItems.length > 0) {
+      // Identify loyalty items (3+ reorders)
+      loyaltyItems = reorderData.reorderPatterns.loyaltyItems.map(item => ({
+        name: item.title,
+        variantTitle: item.variantTitle,
+        reorderCount: item.orderCount,
+        totalQuantity: item.totalQuantity,
+        displayName: item.variantTitle ? `${item.title} (${item.variantTitle})` : item.title
+      }));
+
+      // Create conversational talking points
+      if (loyaltyItems.length > 0) {
+        const topLoyalty = loyaltyItems[0];
+        conversationalInsights.push(`You're clearly a fan of the ${topLoyalty.displayName} - you've ordered it ${topLoyalty.reorderCount} separate times!`);
+      }
+
+      // Analyze diversity
+      const uniqueItems = reorderData.orderHistory.reduce((acc, order) => acc + order.itemCount, 0);
+      const reorderedItems = reorderData.frequentlyReorderedItems.length;
+      
+      if (reorderedItems / uniqueItems > 0.7) {
+        diversityScore = 'consistent';
+        conversationalInsights.push("You know what you like and stick with your favorites - I respect that!");
+      } else if (reorderedItems / uniqueItems < 0.3) {
+        diversityScore = 'adventurous';
+        conversationalInsights.push("You're always trying new things - I love working with adventurous customers!");
+      } else {
+        diversityScore = 'varied';
+        conversationalInsights.push("You have a nice mix of favorites and new discoveries in your ordering history.");
+      }
+
+      // Premium buyer insights
+      if (reorderData.reorderPatterns.premiumReorders.length > 0) {
+        conversationalInsights.push("I can see you appreciate premium cuts - you have excellent taste!");
+      }
+    }
+
+    // Format frequently reordered items for easy conversation
+    const topReorderedItems = reorderData.frequentlyReorderedItems
+      .slice(0, 5) // Top 5 for conversation
+      .map(item => ({
+        name: item.title,
+        variantTitle: item.variantTitle,
+        displayName: item.variantTitle ? `${item.title} (${item.variantTitle})` : item.title,
+        orderCount: item.orderCount,
+        totalQuantity: item.totalQuantity,
+        conversationalName: formatProductForSpeech(1, item.title) // Use helper function
+      }));
+
+    // Create a speaking summary
+    let speakSummary = `I've analyzed your ${reorderData.totalOrders} orders and found some interesting patterns. `;
+    
+    if (topReorderedItems.length > 0) {
+      const topItem = topReorderedItems[0];
+      speakSummary += `Your most reordered item is the ${topItem.conversationalName}, which you've ordered ${topItem.orderCount} separate times. `;
+      
+      if (topReorderedItems.length > 1) {
+        const secondItem = topReorderedItems[1];
+        speakSummary += `You've also consistently reordered the ${secondItem.conversationalName}. `;
+      }
+    }
+
+    if (conversationalInsights.length > 0) {
+      speakSummary += conversationalInsights[0];
+    }
+
+    res.json({
+      success: true,
+      total_orders: reorderData.totalOrders,
+      total_spent: reorderData.totalSpent,
+      average_order_value: reorderData.averageOrderValue,
+      frequently_reordered_items: topReorderedItems,
+      loyalty_items: loyaltyItems,
+      reorder_patterns: reorderData.reorderPatterns,
+      diversity_score: diversityScore,
+      conversational_insights: conversationalInsights,
+      order_history_summary: reorderData.orderHistory.slice(0, 10), // Recent orders
+      speak: speakSummary
+    });
+
+  } catch (error) {
+    console.error('Error in /tools/get-customer-reorder-patterns:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      speak: "I'm having trouble analyzing your ordering patterns right now. Let me focus on what I know you'll enjoy."
     });
   }
 });

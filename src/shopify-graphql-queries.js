@@ -388,6 +388,207 @@ export async function findLatestAbandonedCheckout({ email = null, phone = null }
 }
 
 /**
+ * GraphQL query to fetch customer orders and analyze reorder patterns
+ */
+const CUSTOMER_ORDER_HISTORY_QUERY = `
+  query GetCustomerOrderHistory($first: Int!, $query: String) {
+    orders(first: $first, query: $query, sortKey: CREATED_AT, reverse: true) {
+      edges {
+        node {
+          id
+          name
+          createdAt
+          totalPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+          }
+          lineItems(first: 100) {
+            edges {
+              node {
+                id
+                title
+                quantity
+                variantTitle
+                sku
+                originalUnitPriceSet {
+                  shopMoney {
+                    amount
+                    currencyCode
+                  }
+                }
+                product {
+                  id
+                  title
+                  handle
+                }
+                variant {
+                  id
+                  title
+                  sku
+                }
+              }
+            }
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+`;
+
+/**
+ * Find frequently reordered items for a customer
+ * This gives Grace better conversational talking points
+ */
+export async function getCustomerFrequentlyReorderedItems(customerPhone, maxOrders = 25) {
+  try {
+    console.log(`🔍 Analyzing reorder patterns for customer: ${customerPhone}`);
+    
+    // Clean phone number for search
+    const cleanPhone = String(customerPhone || "").replace(/[^\d]/g, "");
+    if (!cleanPhone) {
+      throw new Error('Valid phone number required');
+    }
+    
+    // Search for orders by phone number
+    const searchQueries = [
+      `phone:*${cleanPhone}*`,
+      `phone:*${cleanPhone.slice(-10)}*`, // Last 10 digits
+      `customer_phone:*${cleanPhone}*`,
+      `shipping_address.phone:*${cleanPhone}*`,
+      `billing_address.phone:*${cleanPhone}*`
+    ];
+    
+    let allOrders = [];
+    
+    // Try different phone search patterns
+    for (const query of searchQueries) {
+      try {
+        const data = await executeGraphQLQuery(CUSTOMER_ORDER_HISTORY_QUERY, { 
+          first: maxOrders, 
+          query 
+        });
+        
+        if (data.orders.edges.length > 0) {
+          allOrders = data.orders.edges.map(edge => edge.node);
+          console.log(`✅ Found ${allOrders.length} orders using query: ${query}`);
+          break;
+        }
+      } catch (error) {
+        console.log(`   Query failed: ${query} - continuing...`);
+        continue;
+      }
+    }
+    
+    if (allOrders.length === 0) {
+      console.log('ℹ️ No orders found for this customer');
+      return {
+        totalOrders: 0,
+        frequentlyReorderedItems: [],
+        orderHistory: [],
+        averageOrderValue: 0,
+        totalSpent: 0,
+        reorderPatterns: {}
+      };
+    }
+    
+    // Analyze item frequency across orders
+    const itemFrequency = {};
+    const itemDetails = {};
+    let totalSpent = 0;
+    
+    allOrders.forEach(order => {
+      const orderValue = parseFloat(order.totalPriceSet?.shopMoney?.amount || 0);
+      totalSpent += orderValue;
+      
+      order.lineItems.edges.forEach(edge => {
+        const item = edge.node;
+        const productId = item.product.id;
+        const variantId = item.variant?.id;
+        
+        // Use variant ID as key, fallback to product ID
+        const itemKey = variantId || productId;
+        
+        if (!itemFrequency[itemKey]) {
+          itemFrequency[itemKey] = {
+            count: 0,
+            totalQuantity: 0,
+            orders: []
+          };
+          
+          itemDetails[itemKey] = {
+            title: item.title,
+            variantTitle: item.variantTitle,
+            productHandle: item.product.handle,
+            sku: item.sku,
+            lastPrice: parseFloat(item.originalUnitPriceSet?.shopMoney?.amount || 0)
+          };
+        }
+        
+        itemFrequency[itemKey].count += 1;
+        itemFrequency[itemKey].totalQuantity += item.quantity;
+        itemFrequency[itemKey].orders.push({
+          orderName: order.name,
+          createdAt: order.createdAt,
+          quantity: item.quantity
+        });
+      });
+    });
+    
+    // Find items ordered in multiple separate orders (reordered items)
+    const frequentlyReorderedItems = Object.entries(itemFrequency)
+      .filter(([_, data]) => data.count >= 2) // Ordered in 2+ separate orders
+      .map(([itemKey, data]) => ({
+        itemKey,
+        ...itemDetails[itemKey],
+        orderCount: data.count,
+        totalQuantity: data.totalQuantity,
+        orders: data.orders,
+        averageQuantityPerOrder: Math.round(data.totalQuantity / data.count * 10) / 10
+      }))
+      .sort((a, b) => b.orderCount - a.orderCount); // Sort by reorder frequency
+    
+    const averageOrderValue = allOrders.length > 0 ? totalSpent / allOrders.length : 0;
+    
+    // Create reorder patterns summary
+    const reorderPatterns = {
+      loyaltyItems: frequentlyReorderedItems.filter(item => item.orderCount >= 3),
+      consistentReorders: frequentlyReorderedItems.filter(item => item.orderCount === 2),
+      highVolumeReorders: frequentlyReorderedItems.filter(item => item.totalQuantity >= 5),
+      premiumReorders: frequentlyReorderedItems.filter(item => item.lastPrice >= 50)
+    };
+    
+    console.log(`✅ Analysis complete: ${frequentlyReorderedItems.length} frequently reordered items found`);
+    
+    return {
+      totalOrders: allOrders.length,
+      frequentlyReorderedItems,
+      orderHistory: allOrders.map(order => ({
+        name: order.name,
+        createdAt: order.createdAt,
+        totalValue: parseFloat(order.totalPriceSet?.shopMoney?.amount || 0),
+        currency: order.totalPriceSet?.shopMoney?.currencyCode || 'USD',
+        itemCount: order.lineItems.edges.length
+      })),
+      averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+      totalSpent: Math.round(totalSpent * 100) / 100,
+      reorderPatterns
+    };
+    
+  } catch (error) {
+    console.error(`❌ Failed to analyze reorder patterns: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Get count of abandoned checkouts
  */
 export async function getAbandonedCheckoutsCount(query = null) {
