@@ -526,86 +526,47 @@ export async function createWinBackDraftOrder({
       throw new Error('Shopify credentials not configured');
     }
 
-    // Smart product selection: prioritize customer history, fallback to safe popular items
+    // Intelligent product selection: prioritize customer history + similar recommendations
     let variantsToUse = productVariants;
-    let orderContext = { usedHistory: false, historyItems: [], targetAmount };
+    let orderContext = { usedHistory: false, historyItems: [], targetAmount, reasoning: [] };
     
     if (productVariants.length === 0) {
-      console.log('📦 No specific variants provided, checking customer history...');
+      console.log('🧠 No specific variants provided, using intelligent product selector...');
       
-      // First: Try to get their previous order history
-      const customerHistory = await getCustomerOrderHistory(customerPhone, customerEmail, 3);
+      // Import and use the intelligent product selector
+      const { getIntelligentProductRecommendations } = await import('./intelligent-product-selector.js');
       
-      if (customerHistory.success && customerHistory.popularItems.length > 0) {
-        console.log(`✅ Found customer order history: ${customerHistory.popularItems.length} unique items`);
+      const intelligentRecommendations = await getIntelligentProductRecommendations({
+        customerPhone,
+        customerEmail,
+        targetAmount,
+        maxItems: 6
+      });
+      
+      if (intelligentRecommendations.success && intelligentRecommendations.recommendations.length > 0) {
+        console.log(`✅ Got ${intelligentRecommendations.recommendations.length} intelligent recommendations`);
         
-        // Use their most frequently ordered items (top 3)
-        variantsToUse = customerHistory.popularItems
-          .slice(0, 3)
-          .map(item => item.variantId);
-          
+        // Extract variant IDs and quantities
+        variantsToUse = intelligentRecommendations.recommendations.map(rec => rec.variantId);
+        
+        // Store the full recommendation context for later use
         orderContext = {
-          usedHistory: true,
-          historyItems: customerHistory.popularItems.slice(0, 3),
-          lastOrderDate: customerHistory.lastOrderDate,
-          lastOrderTotal: customerHistory.lastOrderTotal,
-          totalOrders: customerHistory.totalOrders
+          usedHistory: intelligentRecommendations.context.usedHistory,
+          historyItems: intelligentRecommendations.context.historyItems,
+          reasoning: intelligentRecommendations.context.reasoning,
+          recommendations: intelligentRecommendations.recommendations,
+          targetAmount,
+          estimatedTotal: intelligentRecommendations.totalEstimated
         };
         
-        console.log(`🎯 Using customer's favorite items:`, orderContext.historyItems.map(i => i.title));
+        console.log(`🎯 Intelligent selection:`, intelligentRecommendations.recommendations.map(r => `${r.quantity}x ${r.title} ($${r.price}) - ${r.reason}`));
+        console.log(`📝 Reasoning:`, orderContext.reasoning);
       } else {
-        console.log('📦 No customer history found, fetching store popular products...');
-        
-        try {
-          // Fallback: Fetch top-selling products from store
-          const popularVariantsQuery = `
-            query {
-              productVariants(first: 3, sortKey: INVENTORY_TOTAL, reverse: true) {
-                edges {
-                  node {
-                    id
-                    title
-                    availableForSale
-                    product {
-                      title
-                      tags
-                    }
-                  }
-                }
-              }
-            }
-          `;
-
-          const popularResponse = await fetch(shopifyGraphqlEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Shopify-Access-Token': shopifyAccessToken
-            },
-            body: JSON.stringify({
-              query: popularVariantsQuery
-            })
-          });
-
-          const popularData = await popularResponse.json();
-          
-          if (popularData.data?.productVariants?.edges?.length > 0) {
-            // Use actual available products from your store
-            variantsToUse = popularData.data.productVariants.edges
-              .filter(edge => edge.node.availableForSale)
-              .map(edge => edge.node.id);
-            
-            console.log(`✅ Using ${variantsToUse.length} store popular products as fallback`);
-          } else {
-            throw new Error('No available products found in store');
-          }
-        } catch (error) {
-          console.error('❌ Could not fetch popular products:', error.message);
-          return {
-            success: false,
-            error: 'No products specified and could not fetch default products. Please provide specific variant IDs.'
-          };
-        }
+        console.error('❌ Intelligent product selector failed:', intelligentRecommendations.error);
+        return {
+          success: false,
+          error: 'Could not determine appropriate products for this customer. Please specify specific variant IDs.'
+        };
       }
     }
 
@@ -665,49 +626,70 @@ export async function createWinBackDraftOrder({
           };
         }
         
-        // Smart quantity calculation to reach target amount
+        // Use intelligent quantity recommendations if available, otherwise use smart calculation
         let currentTotal = 0;
         const targetBeforeDiscount = targetAmount;
         
         console.log(`🎯 Building order to reach $${targetBeforeDiscount} (target: $${targetAmount})`);
         
-        // Sort variants by price (ascending) for better distribution
-        variants.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
-        
-        // Start with 1 of each item, then add more of the most expensive items to reach target
-        variants.forEach(variant => {
-          const price = parseFloat(variant.price);
-          lineItems.push({
-            variantId: variant.id,
-            quantity: 1
+        if (orderContext.recommendations && orderContext.recommendations.length > 0) {
+          // Use the intelligent recommendations with their calculated quantities
+          console.log('📝 Using intelligent quantity recommendations');
+          
+          orderContext.recommendations.forEach(rec => {
+            const variant = variants.find(v => v.id === rec.variantId);
+            if (variant) {
+              const price = parseFloat(variant.price);
+              lineItems.push({
+                variantId: variant.id,
+                quantity: rec.quantity
+              });
+              currentTotal += price * rec.quantity;
+              console.log(`Added ${rec.quantity}x ${variant.product.title} - ${variant.title} ($${price} each) - ${rec.reason} - Running total: $${currentTotal.toFixed(2)}`);
+            }
           });
-          currentTotal += price;
-          console.log(`Added 1x ${variant.product.title} - ${variant.title} ($${price}) - Running total: $${currentTotal.toFixed(2)}`);
-        });
-        
-        // If we haven't reached target, add more of the higher-value items
-        if (currentTotal < targetBeforeDiscount && variants.length > 0) {
-          const remainingAmount = targetBeforeDiscount - currentTotal;
-          console.log(`🔄 Need $${remainingAmount.toFixed(2)} more to reach target`);
+        } else {
+          // Fallback to basic quantity calculation
+          console.log('📝 Using fallback quantity calculation');
           
-          // Add quantities of the most expensive items first
-          const expensiveVariants = [...variants].sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+          // Sort variants by price (ascending) for better distribution
+          variants.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
           
-          for (const variant of expensiveVariants) {
+          // Start with 1 of each item, then add more of the most expensive items to reach target
+          variants.forEach(variant => {
             const price = parseFloat(variant.price);
-            const additionalQuantity = Math.floor((targetBeforeDiscount - currentTotal) / price);
+            lineItems.push({
+              variantId: variant.id,
+              quantity: 1
+            });
+            currentTotal += price;
+            console.log(`Added 1x ${variant.product.title} - ${variant.title} ($${price}) - Running total: $${currentTotal.toFixed(2)}`);
+          });
+          
+          // If we haven't reached target, add more of the higher-value items
+          if (currentTotal < targetBeforeDiscount && variants.length > 0) {
+            const remainingAmount = targetBeforeDiscount - currentTotal;
+            console.log(`🔄 Need $${remainingAmount.toFixed(2)} more to reach target`);
             
-            if (additionalQuantity > 0) {
-              // Find existing line item and increase quantity
-              const existingItem = lineItems.find(item => item.variantId === variant.id);
-              if (existingItem) {
-                existingItem.quantity += additionalQuantity;
-                currentTotal += (price * additionalQuantity);
-                console.log(`Increased ${variant.product.title} to ${existingItem.quantity}x - Added $${(price * additionalQuantity).toFixed(2)} - Running total: $${currentTotal.toFixed(2)}`);
-              }
+            // Add quantities of the most expensive items first
+            const expensiveVariants = [...variants].sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+            
+            for (const variant of expensiveVariants) {
+              const price = parseFloat(variant.price);
+              const additionalQuantity = Math.floor((targetBeforeDiscount - currentTotal) / price);
               
-              if (currentTotal >= targetBeforeDiscount * 0.95) { // Within 5% of target
-                break;
+              if (additionalQuantity > 0 && additionalQuantity <= 2) { // Don't go crazy with quantities
+                // Find existing line item and increase quantity
+                const existingItem = lineItems.find(item => item.variantId === variant.id);
+                if (existingItem) {
+                  existingItem.quantity += additionalQuantity;
+                  currentTotal += (price * additionalQuantity);
+                  console.log(`Increased ${variant.product.title} to ${existingItem.quantity}x - Added $${(price * additionalQuantity).toFixed(2)} - Running total: $${currentTotal.toFixed(2)}`);
+                }
+                
+                if (currentTotal >= targetBeforeDiscount * 0.95) { // Within 5% of target
+                  break;
+                }
               }
             }
           }
