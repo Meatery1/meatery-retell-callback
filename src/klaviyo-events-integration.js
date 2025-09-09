@@ -525,7 +525,7 @@ export async function createWinBackDraftOrder({
       throw new Error('Shopify credentials not configured');
     }
 
-    // Smart product selection: prioritize customer history, fallback to store popular items
+    // Smart product selection: prioritize customer history, fallback to safe popular items
     let variantsToUse = productVariants;
     let orderContext = { usedHistory: false, historyItems: [] };
     

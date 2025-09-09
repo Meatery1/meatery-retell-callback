@@ -1213,9 +1213,9 @@ app.post("/tools/send-winback-draft-order", async (req, res) => {
           .slice(0, 2) // Max 2 items to mention
           .join(' and ');
           
-        speakMessage = `Perfect! I looked at your order history and saw you love ${favoriteItems}, so I've created a special ${discount_value}% off order with those items. You'll receive an email invoice and a text with the checkout link in seconds!`;
+        speakMessage = `Perfect! I looked at your order history and saw you love ${favoriteItems}, so I've created a special ${discount_value}% off order with those items. I'm sending the checkout link to your phone now.`;
       } else {
-        speakMessage = `Perfect! I've created a special ${discount_value}% off order with some of our most popular items. You'll receive an email invoice and a text message with the direct checkout link in just a few seconds. The discount is already applied!`;
+        speakMessage = `Perfect! I've created a special ${discount_value}% off order with some of our most popular items. I'm sending the checkout link to your phone now - the discount is already applied!`;
       }
       
       res.json({
