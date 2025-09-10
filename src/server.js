@@ -1249,18 +1249,18 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
       });
     }
 
-    console.log('📧 Sending voicemail follow-up event:', {
+    console.log('📧 Creating Klaviyo voicemail event:', {
       phone: finalCustomerPhone,
       name: finalCustomerName,
       email: finalCustomerEmail
     });
 
-    // Send voicemail event to Klaviyo
+    // Send voicemail event directly to Klaviyo
     const voicemailResult = await sendVoicemailLeftEvent({
       customerEmail: finalCustomerEmail,
       customerPhone: finalCustomerPhone,
       customerName: finalCustomerName,
-      callId: callData?.call_id,
+      callId: callData?.call_id || `manual-${Date.now()}`,
       transcript: callData?.transcript || message_left,
       metadata: {
         source: callData?.metadata?.source || 'winback_campaign',
