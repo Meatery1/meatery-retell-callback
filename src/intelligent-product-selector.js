@@ -414,8 +414,8 @@ function adjustQuantitiesForTarget(recommendations, targetAmount) {
   
   console.log(`🎯 Starting total: $${currentTotal.toFixed(2)}, Target: $${targetAmount}`);
   
-  // If we're already close to target (within 15%), we're good
-  if (currentTotal >= targetAmount * 0.85 && currentTotal <= targetAmount * 1.15) {
+  // If we're already close to target (within 10%), we're good
+  if (currentTotal >= targetAmount * 0.95 && currentTotal <= targetAmount * 1.10) {
     console.log('✅ Already close to target amount');
     return validRecommendations;
   }
@@ -429,7 +429,7 @@ function adjustQuantitiesForTarget(recommendations, targetAmount) {
     const sorted = [...validRecommendations].sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
     
     for (const item of sorted) {
-      if (currentTotal >= targetAmount * 0.9) break; // Within 10% is acceptable
+      if (currentTotal >= targetAmount * 0.95) break; // Within 5% is acceptable
       
       const itemPrice = parseFloat(item.price);
       const additionalQty = Math.floor((targetAmount - currentTotal) / itemPrice);
