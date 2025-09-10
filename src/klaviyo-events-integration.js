@@ -1131,6 +1131,9 @@ export async function createAndSendKlaviyoDiscount(params) {
   return sendKlaviyoDiscountWithCheckout(params);
 }
 
+// Export the function directly for named imports
+export { sendVoicemailLeftEvent };
+
 export default {
   sendKlaviyoDiscountWithCheckout,
   createAndSendKlaviyoDiscount,
