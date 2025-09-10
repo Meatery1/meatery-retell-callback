@@ -4,6 +4,67 @@
  */
 
 /**
+ * Get current prices for variant IDs
+ */
+async function getCurrentPricesForVariants(variantIds, shopifyGraphqlEndpoint, shopifyAccessToken) {
+  if (!variantIds || variantIds.length === 0) return [];
+  
+  try {
+    const query = `
+      query getVariantPrices($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on ProductVariant {
+            id
+            price
+            title
+            availableForSale
+            product {
+              title
+            }
+          }
+        }
+      }
+    `;
+    
+    const formattedIds = variantIds.map(id => 
+      id.startsWith('gid://shopify') ? id : `gid://shopify/ProductVariant/${id}`
+    );
+    
+    const response = await fetch(shopifyGraphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyAccessToken
+      },
+      body: JSON.stringify({
+        query,
+        variables: { ids: formattedIds }
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.errors) {
+      console.error('❌ GraphQL errors getting variant prices:', data.errors);
+      return [];
+    }
+    
+    return (data.data?.nodes || [])
+      .filter(node => node && node.availableForSale)
+      .map(node => ({
+        variantId: node.id,
+        price: parseFloat(node.price),
+        title: node.title,
+        productTitle: node.product?.title
+      }));
+      
+  } catch (error) {
+    console.error('❌ Error getting variant prices:', error);
+    return [];
+  }
+}
+
+/**
  * Get intelligent product recommendations based on customer history and similar items
  */
 export async function getIntelligentProductRecommendations({
@@ -37,14 +98,14 @@ export async function getIntelligentProductRecommendations({
       // Get their top 2-3 favorite items
       const favoriteItems = customerHistory.popularItems.slice(0, 3);
       
-      // Add their favorites to recommendations
+      // Add their favorites to recommendations (prices now included from GraphQL)
       recommendations.push(...favoriteItems.map(item => ({
         variantId: item.variantId,
         title: item.title,
-        price: item.price,
+        price: item.price || 50, // Use price from GraphQL query
         quantity: 1,
         reason: 'customer_favorite',
-        orderCount: item.orderCount
+        orderCount: item.orderCount || item.frequency
       })));
       
       context.usedHistory = true;
@@ -314,15 +375,32 @@ async function getCuratedStarterSelection(shopifyGraphqlEndpoint, shopifyAccessT
 function adjustQuantitiesForTarget(recommendations, targetAmount) {
   if (recommendations.length === 0) return recommendations;
   
-  // Start with 1 of each item
-  let currentTotal = recommendations.reduce((sum, item) => sum + item.price, 0);
+  // Filter out items with invalid prices and fix price data
+  const validRecommendations = recommendations.filter(item => {
+    const price = parseFloat(item.price);
+    if (isNaN(price) || price <= 0) {
+      console.log(`⚠️ Filtering out item with invalid price: ${item.title} (price: ${item.price})`);
+      return false;
+    }
+    // Ensure price is a number
+    item.price = price;
+    return true;
+  });
+  
+  if (validRecommendations.length === 0) {
+    console.log('❌ No valid items with prices found');
+    return recommendations; // Return original to avoid complete failure
+  }
+  
+  // Start with 1 of each valid item
+  let currentTotal = validRecommendations.reduce((sum, item) => sum + parseFloat(item.price), 0);
   
   console.log(`🎯 Starting total: $${currentTotal.toFixed(2)}, Target: $${targetAmount}`);
   
   // If we're already close to target (within 15%), we're good
   if (currentTotal >= targetAmount * 0.85 && currentTotal <= targetAmount * 1.15) {
     console.log('✅ Already close to target amount');
-    return recommendations;
+    return validRecommendations;
   }
   
   // If we need more, add quantities aggressively to reach target
@@ -331,22 +409,41 @@ function adjustQuantitiesForTarget(recommendations, targetAmount) {
     console.log(`Need $${remainingAmount.toFixed(2)} more`);
     
     // Sort by price descending to add expensive items first
-    const sorted = [...recommendations].sort((a, b) => b.price - a.price);
+    const sorted = [...validRecommendations].sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
     
     for (const item of sorted) {
       if (currentTotal >= targetAmount * 0.9) break; // Within 10% is acceptable
       
-      const additionalQty = Math.floor((targetAmount - currentTotal) / item.price);
-      if (additionalQty > 0 && item.quantity < 6) { // Allow up to 6 of any item
-        const qtyToAdd = Math.min(additionalQty, 4); // Max 4 additional of any item
+      const itemPrice = parseFloat(item.price);
+      const additionalQty = Math.floor((targetAmount - currentTotal) / itemPrice);
+      if (additionalQty > 0 && item.quantity < 8) { // Allow up to 8 of any item
+        const qtyToAdd = Math.min(additionalQty, 6); // Max 6 additional of any item
         item.quantity += qtyToAdd;
-        currentTotal += item.price * qtyToAdd;
+        currentTotal += itemPrice * qtyToAdd;
         
-        console.log(`Increased ${item.title} to ${item.quantity}x (+$${(item.price * qtyToAdd).toFixed(2)})`);
+        console.log(`Increased ${item.title} to ${item.quantity}x (+$${(itemPrice * qtyToAdd).toFixed(2)})`);
       }
     }
   }
   
+  // If we still haven't reached target and have valid items, add more aggressively
+  if (currentTotal < targetAmount * 0.8 && validRecommendations.length > 0) {
+    console.log(`🔄 Still need more - current: $${currentTotal.toFixed(2)}, target: $${targetAmount}`);
+    
+    // Add more of the most expensive items to reach target
+    const mostExpensive = validRecommendations.sort((a, b) => parseFloat(b.price) - parseFloat(a.price))[0];
+    const neededAmount = targetAmount - currentTotal;
+    const additionalQty = Math.ceil(neededAmount / parseFloat(mostExpensive.price));
+    
+    if (additionalQty > 0 && mostExpensive.quantity < 10) {
+      const qtyToAdd = Math.min(additionalQty, 6);
+      mostExpensive.quantity += qtyToAdd;
+      currentTotal += parseFloat(mostExpensive.price) * qtyToAdd;
+      
+      console.log(`🚀 Added ${qtyToAdd} more of ${mostExpensive.title} to reach target - new total: $${currentTotal.toFixed(2)}`);
+    }
+  }
+  
   console.log(`✅ Final total: $${currentTotal.toFixed(2)}`);
-  return recommendations;
+  return validRecommendations;
 }

@@ -83,6 +83,8 @@ const ABANDONED_CHECKOUTS_QUERY = `
                   id
                   title
                   sku
+                  price
+                  availableForSale
                 }
               }
             }
@@ -509,6 +511,8 @@ const ORDERS_BY_PHONE_QUERY = `
                   id
                   title
                   sku
+                  price
+                  availableForSale
                 }
               }
             }

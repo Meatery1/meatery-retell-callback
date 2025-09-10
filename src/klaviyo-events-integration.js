@@ -230,6 +230,8 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
                               id
                               title
                               sku
+                              price
+                              availableForSale
                               product {
                                 title
                                 vendor
@@ -438,35 +440,51 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
             title: lineItem.title,
             vendor: lineItem.variant?.product?.vendor || 'Unknown',
             quantity: lineItem.quantity,
-            sku: lineItem.variant?.sku || ''
+            sku: lineItem.variant?.sku || '',
+            price: parseFloat(lineItem.variant?.price || 0),
+            availableForSale: lineItem.variant?.availableForSale || false
           };
         }).filter(item => item.variantId) // Only include items with valid variant IDs
       };
     });
 
-    // Get all unique variant IDs from their order history
+    // Get all unique variant IDs from their order history with prices
     const allVariantIds = [];
     const itemFrequency = {};
+    const itemPrices = {}; // Track current prices
 
     orderHistory.forEach(order => {
       order.items.forEach(item => {
-        if (item.variantId) {
+        if (item.variantId && item.availableForSale) {
           allVariantIds.push(item.variantId);
           const key = `${item.title}_${item.variantId}`;
           itemFrequency[key] = (itemFrequency[key] || 0) + item.quantity;
+          
+          // Store the most recent price for this item
+          if (item.price > 0) {
+            itemPrices[key] = item.price;
+          }
         }
       });
     });
 
-    // Sort items by frequency (most ordered first)
+    // Sort items by frequency (most ordered first) and include prices
     const popularItems = Object.entries(itemFrequency)
       .sort((a, b) => b[1] - a[1])
       .map(([key, frequency]) => {
         const parts = key.split('_');
         const variantId = parts[parts.length - 1];
         const title = parts.slice(0, -1).join('_');
-        return { variantId, title, frequency };
-      });
+        const price = itemPrices[key] || 0; // Get current price
+        return { 
+          variantId, 
+          title, 
+          frequency,
+          price: price,
+          orderCount: frequency // Add orderCount for compatibility
+        };
+      })
+      .filter(item => item.price > 0); // Only include items with valid prices
 
     return {
       success: true,
