@@ -71,7 +71,8 @@ export async function getIntelligentProductRecommendations({
   customerPhone,
   customerEmail,
   targetAmount = 400,
-  maxItems = 6
+  maxItems = 6,
+  searchTerms = [] // New parameter for specific product searches
 }) {
   try {
     console.log('🧠 Getting intelligent product recommendations...');
@@ -91,6 +92,25 @@ export async function getIntelligentProductRecommendations({
     
     let recommendations = [];
     let context = { usedHistory: false, historyItems: [], reasoning: [] };
+    
+    // First, search for any specific products mentioned
+    if (searchTerms && searchTerms.length > 0) {
+      console.log(`🔍 Searching for specific products: ${searchTerms.join(', ')}`);
+      
+      for (const searchTerm of searchTerms) {
+        const searchResults = await searchProductsByName(searchTerm, shopifyGraphqlEndpoint, shopifyAccessToken);
+        
+        if (searchResults.length > 0) {
+          recommendations.push(...searchResults.map(item => ({
+            ...item,
+            quantity: 1,
+            reason: `customer_requested_${searchTerm}`
+          })));
+          
+          context.reasoning.push(`Added ${searchResults.length} products matching "${searchTerm}"`);
+        }
+      }
+    }
     
     if (customerHistory.success && customerHistory.popularItems.length > 0) {
       console.log(`✅ Found customer history: ${customerHistory.popularItems.length} previously purchased items`);
@@ -194,6 +214,112 @@ export async function getIntelligentProductRecommendations({
 }
 
 /**
+ * Search for any products in the catalog by name or description
+ */
+async function searchProductsByName(searchTerm, shopifyGraphqlEndpoint, shopifyAccessToken) {
+  try {
+    console.log(`🔍 Searching for available products containing: "${searchTerm}"`);
+    
+    const searchQuery = `
+      query SearchAvailableProducts($query: String!, $first: Int!) {
+        products(first: $first, query: $query) {
+          edges {
+            node {
+              id
+              title
+              handle
+              productType
+              vendor
+              tags
+              status
+              publishedOnCurrentPublication
+              variants(first: 10) {
+                edges {
+                  node {
+                    id
+                    title
+                    price
+                    availableForSale
+                    inventoryQuantity
+                    inventoryPolicy
+                    sku
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+    
+    const response = await fetch(shopifyGraphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyAccessToken
+      },
+      body: JSON.stringify({
+        query: searchQuery,
+        variables: { 
+          query: `available_for_sale:true AND (title:*${searchTerm}* OR product_type:*${searchTerm}* OR tag:*${searchTerm}*)`,
+          first: 20
+        }
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.errors) {
+      console.error('❌ GraphQL errors:', data.errors);
+      return [];
+    }
+    
+    const foundProducts = [];
+    
+    data.data?.products?.edges?.forEach(edge => {
+      const product = edge.node;
+      
+      // Skip if not active or not published to online store
+      if (product.status !== 'ACTIVE' || !product.publishedOnCurrentPublication) return;
+      
+      // Get the best variant (available and reasonably priced)
+      const availableVariants = product.variants.edges
+        .map(vEdge => vEdge.node)
+        .filter(variant => {
+          const isAvailable = variant.availableForSale;
+          const hasInventory = variant.inventoryQuantity > 0 || variant.inventoryPolicy === 'CONTINUE';
+          const isReasonablyPriced = parseFloat(variant.price) > 10; // Exclude cheap/promo items
+          
+          return isAvailable && hasInventory && isReasonablyPriced;
+        });
+      
+      if (availableVariants.length > 0) {
+        // Use the first available variant
+        const variant = availableVariants[0];
+        
+        foundProducts.push({
+          variantId: variant.id,
+          title: `${product.title}${variant.title !== 'Default Title' ? ` - ${variant.title}` : ''}`,
+          price: parseFloat(variant.price),
+          productType: product.productType,
+          tags: product.tags,
+          reason: 'name_search',
+          sku: variant.sku,
+          inventoryQuantity: variant.inventoryQuantity
+        });
+      }
+    });
+    
+    console.log(`✅ Found ${foundProducts.length} available products matching "${searchTerm}"`);
+    return foundProducts;
+    
+  } catch (error) {
+    console.error('❌ Error searching products by name:', error);
+    return [];
+  }
+}
+
+/**
  * Find products similar to customer's favorites
  */
 async function findSimilarProducts(favoriteItems, shopifyGraphqlEndpoint, shopifyAccessToken) {
@@ -226,16 +352,19 @@ async function findSimilarProducts(favoriteItems, shopifyGraphqlEndpoint, shopif
     const searchQuery = queryConditions.length > 0 ? queryConditions.join(' OR ') : 'available_for_sale:true';
     
     const similarProductsQuery = `
-      query findSimilarProducts($query: String!) {
-        products(first: 10, query: $query) {
+      query findSimilarProducts($query: String!, $first: Int!) {
+        products(first: $first, query: $query) {
           edges {
             node {
               id
               title
+              handle
               productType
+              vendor
               tags
               status
-              variants(first: 3) {
+              publishedOnCurrentPublication
+              variants(first: 10) {
                 edges {
                   node {
                     id
@@ -243,6 +372,8 @@ async function findSimilarProducts(favoriteItems, shopifyGraphqlEndpoint, shopif
                     price
                     availableForSale
                     inventoryQuantity
+                    inventoryPolicy
+                    sku
                   }
                 }
               }
@@ -260,14 +391,18 @@ async function findSimilarProducts(favoriteItems, shopifyGraphqlEndpoint, shopif
       },
       body: JSON.stringify({
         query: similarProductsQuery,
-        variables: { query: searchQuery }
+        variables: { 
+          query: searchQuery,
+          first: 10
+        }
       })
     });
     
     const data = await response.json();
     
     if (data.errors) {
-      throw new Error(data.errors[0].message);
+      console.error('❌ GraphQL errors:', data.errors);
+      return [];
     }
     
     const similarProducts = [];
@@ -275,13 +410,19 @@ async function findSimilarProducts(favoriteItems, shopifyGraphqlEndpoint, shopif
     data.data?.products?.edges?.forEach(edge => {
       const product = edge.node;
       
-      // Skip if not active
-      if (product.status !== 'ACTIVE') return;
+      // Skip if not active or not published to online store
+      if (product.status !== 'ACTIVE' || !product.publishedOnCurrentPublication) return;
       
       // Get the best variant (available and reasonably priced)
       const availableVariants = product.variants.edges
         .map(vEdge => vEdge.node)
-        .filter(variant => variant.availableForSale && parseFloat(variant.price) > 10); // Exclude cheap/promo items
+        .filter(variant => {
+          const isAvailable = variant.availableForSale;
+          const hasInventory = variant.inventoryQuantity > 0 || variant.inventoryPolicy === 'CONTINUE';
+          const isReasonablyPriced = parseFloat(variant.price) > 10; // Exclude cheap/promo items
+          
+          return isAvailable && hasInventory && isReasonablyPriced;
+        });
       
       if (availableVariants.length > 0) {
         // Use the first available variant
@@ -292,7 +433,9 @@ async function findSimilarProducts(favoriteItems, shopifyGraphqlEndpoint, shopif
           title: `${product.title}${variant.title !== 'Default Title' ? ` - ${variant.title}` : ''}`,
           price: parseFloat(variant.price),
           productType: product.productType,
-          tags: product.tags
+          tags: product.tags,
+          sku: variant.sku,
+          inventoryQuantity: variant.inventoryQuantity
         });
       }
     });
