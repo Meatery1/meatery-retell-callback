@@ -891,6 +891,7 @@ export async function sendWinBackDraftOrderEvent({
             checkout_url: checkoutUrl,
             discount_value: discountValue,
             total_value: totalValue,
+            original_value: parseFloat((totalValue / (1 - discountValue/100)).toFixed(2)),
             campaign_type: 'win_back',
             channel: customerPhone ? 'sms' : 'email'
           },
