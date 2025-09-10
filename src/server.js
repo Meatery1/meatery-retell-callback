@@ -1468,8 +1468,24 @@ app.post("/tools/get-customer-reorder-patterns", async (req, res) => {
       }
     }
 
-    // Format frequently reordered items for easy conversation
+    // Format frequently reordered items for easy conversation (FILTER OUT PET PRODUCTS)
     const topReorderedItems = reorderData.frequentlyReorderedItems
+      .filter(item => {
+        // Filter out dog food and pet products
+        const title = (item.title || '').toLowerCase();
+        const isDogFood = title.includes('dog food') || 
+                         title.includes('pet food') || 
+                         title.includes('dog treat') || 
+                         title.includes('pet treat') ||
+                         title.includes('tripe dog') ||
+                         title.includes('texas tripe');
+        
+        if (isDogFood) {
+          console.log(`🚫 Filtering out pet product from conversation: ${item.title}`);
+        }
+        
+        return !isDogFood;
+      })
       .slice(0, 5) // Top 5 for conversation
       .map(item => ({
         name: item.title,

@@ -95,8 +95,25 @@ export async function getIntelligentProductRecommendations({
     if (customerHistory.success && customerHistory.popularItems.length > 0) {
       console.log(`✅ Found customer history: ${customerHistory.popularItems.length} previously purchased items`);
       
-      // Get their top 2-3 favorite items
-      const favoriteItems = customerHistory.popularItems.slice(0, 3);
+      // Get their top 2-3 favorite items (FILTER OUT PET PRODUCTS)
+      const favoriteItems = customerHistory.popularItems
+        .filter(item => {
+          // Filter out dog food and pet products
+          const title = (item.title || '').toLowerCase();
+          const isDogFood = title.includes('dog food') || 
+                           title.includes('pet food') || 
+                           title.includes('dog treat') || 
+                           title.includes('pet treat') ||
+                           title.includes('tripe dog') ||
+                           title.includes('texas tripe');
+          
+          if (isDogFood) {
+            console.log(`🚫 Filtering out pet product from favorites: ${item.title}`);
+          }
+          
+          return !isDogFood;
+        })
+        .slice(0, 3);
       
       // Add their favorites to recommendations (prices now included from GraphQL)
       recommendations.push(...favoriteItems.map(item => ({
