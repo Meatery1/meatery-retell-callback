@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-09-10T09:00:22.960Z",
+  "improvements": {
+    "new_sections": {
+      "discount_request_handling": "If a customer asks about a discount greater than 10%, say: 'Currently, I can offer a 10% discount, which is our standard offer for cart recovery. However, I will check with my team if there's anything more we can do for loyal customers like you.'",
+      "delivery_inquiry_handling": "If a customer asks about delivery specifics, provide: 'I can check the estimated delivery date for you. Typically, orders over $150 qualify for free shipping and arrive within 3-5 business days. Would you like to proceed with the order?'"
+    },
+    "modifications": {
+      "LIVE CONVERSATION OPENING": "Add after the initial question: 'I can help with any questions about pricing or delivery options you might have.'",
+      "OBJECTION HANDLING": "Add: 'If you're comparing options, I can highlight some unique features of our products like quality and sourcing.'",
+      "VOICEMAIL DETECTION": "Add a step to confirm the voicemail: 'If you hear a beep or an automated prompt, consider it voicemail and proceed with leaving a message.'"
+    },
+    "priority_fixes": [
+      "Improve voicemail detection accuracy to reduce unnecessary voicemail messages.",
+      "Clarify discount offers and ensure consistency in messaging by stating the standard discount upfront.",
+      "Address delivery inquiries more effectively by providing standard shipping information."
+    ],
+    "expected_improvement": "The success rate is expected to increase by approximately 15% due to improved handling of common customer queries and more effective voicemail management."
+  },
+  "updated_agents": [],
+  "version": 1757494822960
+}

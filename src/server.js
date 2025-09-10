@@ -1260,6 +1260,121 @@ app.post("/tools/send-winback-draft-order", async (req, res) => {
   }
 });
 
+// --- Win-Back Draft Order with SKUs endpoint for Grace ---
+app.post("/tools/create-win-back-draft-order", async (req, res) => {
+  try {
+    console.log('🎯 Creating win-back draft order with SKUs:', {
+      body: req.body,
+      args: req.body?.args,
+      call: req.body?.call
+    });
+
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    
+    // Get the call context from Retell
+    const callData = req.body?.call || {};
+    
+    // Extract customer phone from call context if not provided in args
+    let customerPhoneFromCall = null;
+    if (callData?.direction === 'outbound') {
+      customerPhoneFromCall = callData?.to_number;  // Customer is the recipient
+    } else if (callData?.direction === 'inbound') {
+      customerPhoneFromCall = callData?.from_number;  // Customer is the caller
+    }
+    
+    // Try to get phone from multiple sources
+    const { 
+      customer_phone,
+      customer_name,
+      customer_email,
+      product_variants = [], // Array of variant IDs to include
+      product_skus = [], // Array of SKUs to include (Grace's specific bundle)
+      discount_value = 20,
+      target_amount = 400 // Target order amount before discount
+    } = params;
+
+    // Determine phone number from various sources
+    const finalCustomerPhone = customer_phone || 
+                               customerPhoneFromCall || 
+                               callData?.retell_llm_dynamic_variables?.customer_phone ||
+                               callData?.metadata?.customer_phone;
+
+    const finalCustomerName = customer_name || 
+                             callData?.retell_llm_dynamic_variables?.customer_name || 
+                             callData?.metadata?.customer_name || 
+                             "Valued Customer";
+
+    const trimmedEmail = (customer_email || 
+                         callData?.retell_llm_dynamic_variables?.customer_email ||
+                         callData?.metadata?.customer_email || "").trim();
+
+    if (!finalCustomerPhone && !trimmedEmail) {
+      return res.json({
+        success: false,
+        error: "No customer contact information provided",
+        speak: "I need either a phone number or email address to create your order."
+      });
+    }
+
+    // Normalize phone number to E.164 format
+    const normalizedPhone = finalCustomerPhone ? normalizeToE164(finalCustomerPhone) : null;
+
+    console.log('🥩 Creating win-back draft order with SKUs:', {
+      phone: normalizedPhone,
+      name: finalCustomerName,
+      email: trimmedEmail,
+      variants: product_variants,
+      skus: product_skus,
+      discount: discount_value
+    });
+
+    // Create draft order with Shopify using SKUs
+    const draftOrderResult = await createWinBackDraftOrder({
+      customerEmail: trimmedEmail,
+      customerPhone: normalizedPhone,
+      customerName: finalCustomerName,
+      productVariants: product_variants,
+      productSKUs: product_skus, // Pass SKUs to the function
+      discountValue: discount_value,
+      targetAmount: target_amount
+    });
+
+    if (!draftOrderResult.success) {
+      return res.json({
+        success: false,
+        error: draftOrderResult.error,
+        speak: "I'm having trouble creating that order right now. Let me try something else for you."
+      });
+    }
+
+    // Success response with checkout URL
+    const checkoutUrl = draftOrderResult.checkoutUrl;
+    const totalValue = draftOrderResult.totalValue;
+    
+    console.log(`✅ Draft order created successfully: ${draftOrderResult.draftOrderId}`);
+    console.log(`💰 Total value: $${totalValue}`);
+    console.log(`🔗 Checkout URL: ${checkoutUrl}`);
+
+    res.json({
+      success: true,
+      draft_order_id: draftOrderResult.draftOrderId,
+      checkout_url: checkoutUrl,
+      total_value: totalValue,
+      discount_applied: discount_value,
+      speak: `Perfect! I've created your order with ${discount_value}% off. The total comes to $${totalValue.toFixed(2)}. I'll text you the checkout link right now.`
+    });
+
+  } catch (error) {
+    console.error('Error in /tools/create-win-back-draft-order:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      speak: "There was an issue creating your order. Let me get someone to help you right away."
+    });
+  }
+});
+
 // --- Customer Order History Lookup for Retell agents ---
 app.post("/tools/get-customer-order-history", async (req, res) => {
   try {

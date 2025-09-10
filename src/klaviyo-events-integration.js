@@ -524,6 +524,76 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
 }
 
 /**
+ * Convert SKUs to Shopify variant IDs
+ */
+async function convertSKUsToVariantIds(skus) {
+  try {
+    const shopifyGraphqlEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-07/graphql.json`;
+    const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN;
+    
+    if (!shopifyAccessToken || !process.env.SHOPIFY_STORE_DOMAIN) {
+      throw new Error('Shopify credentials not configured');
+    }
+
+    // Use a different query approach - search for products by SKU
+    const query = `
+      query getVariantsBySKU {
+        productVariants(first: 250) {
+          edges {
+            node {
+              id
+              sku
+              price
+              title
+              availableForSale
+              product {
+                title
+              }
+            }
+          }
+        }
+      }
+    `;
+    
+    const response = await fetch(shopifyGraphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyAccessToken
+      },
+      body: JSON.stringify({ query })
+    });
+
+    const data = await response.json();
+    
+    if (data.errors) {
+      console.error('❌ Error fetching variants by SKU:', data.errors);
+      return {};
+    }
+
+    // Create SKU to variant mapping
+    const skuToVariant = {};
+    data.data?.productVariants?.edges?.forEach(edge => {
+      const variant = edge.node;
+      if (variant.sku && skus.includes(variant.sku)) {
+        skuToVariant[variant.sku] = {
+          variantId: variant.id,
+          price: parseFloat(variant.price),
+          title: variant.title,
+          productTitle: variant.product?.title,
+          availableForSale: variant.availableForSale
+        };
+      }
+    });
+
+    return skuToVariant;
+  } catch (error) {
+    console.error('❌ Error converting SKUs to variant IDs:', error);
+    return {};
+  }
+}
+
+/**
  * Create a win-back draft order in Shopify with discount and specific products
  */
 export async function createWinBackDraftOrder({
@@ -531,6 +601,7 @@ export async function createWinBackDraftOrder({
   customerPhone, 
   customerName,
   productVariants = [], // Array of Shopify variant IDs
+  productSKUs = [], // Array of SKUs (alternative to productVariants)
   discountValue = 20,
   targetAmount = 400 // Target order value before discount
 }) {
@@ -544,11 +615,37 @@ export async function createWinBackDraftOrder({
       throw new Error('Shopify credentials not configured');
     }
 
-    // Intelligent product selection: prioritize customer history + similar recommendations
     let variantsToUse = productVariants;
     let orderContext = { usedHistory: false, historyItems: [], targetAmount, reasoning: [] };
     
-    if (productVariants.length === 0) {
+    // If SKUs provided, convert them to variant IDs first
+    if (productSKUs && productSKUs.length > 0) {
+      console.log('🔄 Converting SKUs to variant IDs:', productSKUs);
+      const skuMapping = await convertSKUsToVariantIds(productSKUs);
+      
+      const convertedVariants = [];
+      for (const sku of productSKUs) {
+        if (skuMapping[sku] && skuMapping[sku].availableForSale) {
+          convertedVariants.push(skuMapping[sku].variantId);
+          console.log(`✅ SKU ${sku} → ${skuMapping[sku].productTitle} - ${skuMapping[sku].title} ($${skuMapping[sku].price})`);
+        } else {
+          console.log(`⚠️ SKU ${sku} not found or not available`);
+        }
+      }
+      
+      if (convertedVariants.length > 0) {
+        variantsToUse = convertedVariants;
+        // Set a higher target amount for the specific bundle
+        targetAmount = 400; // Ensure we hit the target for the bundle
+      } else {
+        return {
+          success: false,
+          error: 'Could not find any available products with the provided SKUs'
+        };
+      }
+    }
+    // If no variants or SKUs provided, use intelligent product selector
+    else if (productVariants.length === 0) {
       console.log('🧠 No specific variants provided, using intelligent product selector...');
       
       // Import and use the intelligent product selector
