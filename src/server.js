@@ -12,7 +12,8 @@ import {
   sendKlaviyoDiscountWithCheckout,
   createWinBackDraftOrder,
   sendWinBackDraftOrderEvent,
-  getCustomerOrderHistory
+  getCustomerOrderHistory,
+  sendVoicemailLeftEvent
 } from './klaviyo-events-integration.js';
 import {
   fetchAbandonedCheckouts,
@@ -587,6 +588,65 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
         const structured = analysis?.structured || analysis?.custom_analysis_data || {};
         const transcript = data?.transcript || "";
         const orderNumber = m.order_number || structured.order_number;
+        
+        // Check for voicemail detection
+        if (type === "call_analyzed" || type === "call_ended") {
+          const inVoicemail = analysis?.in_voicemail || structured?.in_voicemail;
+          const contactOutcome = structured?.contact_outcome;
+          
+          // Detect voicemail scenarios
+          const isVoicemail = inVoicemail === true || 
+                            contactOutcome === 'voicemail_left' ||
+                            transcript?.toLowerCase().includes('voicemail') ||
+                            transcript?.toLowerCase().includes('leave a message') ||
+                            transcript?.toLowerCase().includes('at the tone');
+          
+          if (isVoicemail && data?.call_status === 'ended') {
+            console.log('📧 Voicemail detected - sending Klaviyo event for SMS follow-up');
+            
+            // Extract customer info from call data
+            let customerPhone = null;
+            let customerName = null;
+            let customerEmail = null;
+            
+            // Get customer contact info based on call direction
+            if (data?.direction === 'outbound') {
+              customerPhone = data?.to_number;  // Customer is the recipient
+            } else if (data?.direction === 'inbound') {
+              customerPhone = data?.from_number;  // Customer is the caller
+            }
+            
+            // Try to get customer info from metadata or dynamic variables
+            customerName = m.customer_name || 
+                          data?.retell_llm_dynamic_variables?.customer_name || 
+                          "Valued Customer";
+            
+            customerEmail = m.customer_email || 
+                           data?.retell_llm_dynamic_variables?.customer_email;
+            
+            // Send voicemail event to Klaviyo
+            try {
+              await sendVoicemailLeftEvent({
+                customerEmail,
+                customerPhone,
+                customerName,
+                callId: data?.call_id,
+                transcript,
+                metadata: {
+                  source: m.source || 'winback_campaign',
+                  customer_id: m.customer_id || m.winback_customer_id,
+                  days_since_last_order: m.days_since_last_order,
+                  total_spent: m.total_spent,
+                  winback_customer_id: m.winback_customer_id
+                }
+              });
+              
+              console.log(`✅ Voicemail event sent to Klaviyo for ${customerPhone || customerEmail}`);
+            } catch (voicemailError) {
+              console.error('❌ Failed to send voicemail event to Klaviyo:', voicemailError.message);
+            }
+          }
+        }
         
         // Check if discount should be sent
         if (type === "call_analyzed" || type === "call_ended") {

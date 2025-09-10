@@ -1,4 +1,4 @@
-import { sendDiscountViaEvent } from './klaviyo-events-service.js';
+import { sendDiscountViaEvent, sendVoicemailLeftEvent } from './klaviyo-events-service.js';
 import { sendKlaviyoDiscountSMS } from './klaviyo-email-service-fixed.js';
 import { fetchAbandonedCheckoutById, findLatestAbandonedCheckout } from './shopify-graphql-queries.js';
 import { createShopifyDiscountCode } from './klaviyo-email-service.js';
@@ -1136,5 +1136,6 @@ export default {
   createAndSendKlaviyoDiscount,
   createWinBackDraftOrder,
   sendWinBackDraftOrderEvent,
-  getCustomerOrderHistory
+  getCustomerOrderHistory,
+  sendVoicemailLeftEvent
 };

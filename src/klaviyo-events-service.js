@@ -113,6 +113,98 @@ export async function sendDiscountViaEvent({
 }
 
 /**
+ * Send voicemail left event to Klaviyo to trigger SMS follow-up
+ */
+export async function sendVoicemailLeftEvent({
+  customerEmail,
+  customerPhone,
+  customerName,
+  callId,
+  transcript,
+  metadata = {}
+}) {
+  const klaviyoApiKey = process.env.KLAVIYO_API_KEY || process.env.KLAVIYO_PRIVATE_KEY;
+  if (!klaviyoApiKey) {
+    throw new Error('Klaviyo API key not configured');
+  }
+
+  try {
+    // Send event to trigger voicemail follow-up flow
+    const eventData = {
+      data: {
+        type: 'event',
+        attributes: {
+          properties: {
+            call_id: callId,
+            agent_name: 'Grace',
+            voicemail_transcript: transcript,
+            call_source: metadata.source || 'winback_campaign',
+            customer_id: metadata.customer_id,
+            days_since_last_order: metadata.days_since_last_order,
+            total_spent: metadata.total_spent,
+            winback_customer_id: metadata.winback_customer_id
+          },
+          metric: {
+            data: {
+              type: 'metric',
+              attributes: {
+                name: 'Grace Voicemail Left'
+              }
+            }
+          },
+          profile: {
+            data: {
+              type: 'profile',
+              attributes: customerPhone ? {
+                phone_number: customerPhone,
+                first_name: customerName,
+                email: customerEmail || undefined,
+                properties: {
+                  last_voicemail_call_id: callId,
+                  last_voicemail_date: new Date().toISOString().split('T')[0]
+                }
+              } : {
+                email: customerEmail,
+                first_name: customerName,
+                properties: {
+                  last_voicemail_call_id: callId,
+                  last_voicemail_date: new Date().toISOString().split('T')[0]
+                }
+              }
+            }
+          },
+          time: new Date().toISOString(),
+          unique_id: `voicemail-${callId}-${Date.now()}`
+        }
+      }
+    };
+
+    const response = await axios.post('https://a.klaviyo.com/api/events/', eventData, {
+      headers: {
+        'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
+        'Content-Type': 'application/json',
+        'revision': '2024-10-15'
+      }
+    });
+
+    console.log(`✅ Klaviyo voicemail event sent for ${customerPhone || customerEmail}`);
+    
+    return {
+      success: true,
+      eventId: response.data?.data?.id || `event-${Date.now()}`,
+      to: customerPhone || customerEmail,
+      status: 'triggered',
+      platform: 'klaviyo-voicemail-event',
+      note: 'Voicemail event sent - will trigger SMS follow-up flow if configured'
+    };
+
+  } catch (error) {
+    console.error(`Error sending Klaviyo voicemail event:`, error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
  * Instructions for setting up Klaviyo Flow:
  * 
  * 1. Go to Klaviyo > Flows
@@ -126,9 +218,20 @@ export async function sendDiscountViaEvent({
  *    - {{ event.checkout_url }}
  * 6. Set flow to Live
  * 
+ * For Voicemail Follow-up Flow:
+ * 1. Create New Flow > Start from Scratch
+ * 2. Set trigger to: API Event > "Grace Voicemail Left"
+ * 3. Add SMS action
+ * 4. Use these variables in your template:
+ *    - {{ person.first_name }}
+ *    - {{ event.agent_name }}
+ *    - {{ event.days_since_last_order }}
+ * 5. Set flow to Live
+ * 
  * This approach guarantees immediate sending without the "No Recipients" issue
  */
 
 export default {
-  sendDiscountViaEvent
+  sendDiscountViaEvent,
+  sendVoicemailLeftEvent
 };
