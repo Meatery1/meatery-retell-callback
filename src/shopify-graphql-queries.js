@@ -62,12 +62,7 @@ const ABANDONED_CHECKOUTS_QUERY = `
                 quantity
                 variantTitle
                 sku
-                originalUnitPriceSet {
-                  shopMoney {
-                    amount
-                    currencyCode
-                  }
-                }
+                # Removed originalUnitPriceSet - using current variant price instead
                 discountedUnitPriceSet {
                   shopMoney {
                     amount
@@ -496,12 +491,7 @@ const ORDERS_BY_PHONE_QUERY = `
                 quantity
                 variantTitle
                 sku
-                originalUnitPriceSet {
-                  shopMoney {
-                    amount
-                    currencyCode
-                  }
-                }
+                # Removed originalUnitPriceSet - using current variant price instead
                 product {
                   id
                   title

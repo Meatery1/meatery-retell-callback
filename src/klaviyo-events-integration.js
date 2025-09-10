@@ -441,7 +441,7 @@ export async function getCustomerOrderHistory(customerPhone, customerEmail, maxO
             vendor: lineItem.variant?.product?.vendor || 'Unknown',
             quantity: lineItem.quantity,
             sku: lineItem.variant?.sku || '',
-            price: parseFloat(lineItem.variant?.price || 0),
+            price: parseFloat(lineItem.variant?.price || 0), // Current selling price
             availableForSale: lineItem.variant?.availableForSale || false
           };
         }).filter(item => item.variantId) // Only include items with valid variant IDs
