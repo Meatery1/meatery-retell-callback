@@ -612,6 +612,15 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
         console.log(`🔍 Voicemail detected: ${isVoicemail} (transcript check: ${transcript?.toLowerCase().includes('voicemail')})`);
         
         if (isVoicemail && type === "call_analyzed") {
+          // Check if this call was already processed manually
+          const callId = data?.call_id;
+          global.processedVoicemails = global.processedVoicemails || new Set();
+          
+          if (global.processedVoicemails.has(callId)) {
+            console.log(`🚫 Voicemail for call ${callId} already processed manually - skipping webhook processing`);
+            return;
+          }
+          
           console.log('📧 Voicemail detected - sending Klaviyo event for SMS follow-up');
           
           // Extract customer info from call data
@@ -1255,16 +1264,105 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
       email: finalCustomerEmail
     });
 
-    // Create draft order with specific products (like win-back function)
-    const draftOrderResult = await createWinBackDraftOrder({
-      customerPhone: finalCustomerPhone,
-      customerName: finalCustomerName,
-      customerEmail: finalCustomerEmail,
-      discountPercentage: 20,
-      channel: 'sms'
+    // Use the exact same logic as the working win-back endpoint
+    console.log('📧 Creating voicemail draft order with predefined products...');
+    let draftOrderResult;
+    try {
+      // Create draft order with EXACT variants - bypass all the smart logic
+      const shopifyGraphqlEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-07/graphql.json`;
+      const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN;
+      
+      const draftOrderMutation = `
+        mutation draftOrderCreate($input: DraftOrderInput!) {
+          draftOrderCreate(input: $input) {
+            draftOrder {
+              id
+              name
+              totalPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              invoiceUrl
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const variables = {
+        input: {
+          email: finalCustomerEmail,
+          lineItems: [
+            { variantId: "gid://shopify/ProductVariant/37661352100037", quantity: 1 }, // Japanese A5 Wagyu Ribeye
+            { variantId: "gid://shopify/ProductVariant/40158682316997", quantity: 1 }, // Japanese A5 Wagyu Filet Mignon
+            { variantId: "gid://shopify/ProductVariant/45106426609880", quantity: 1 }, // Australian Wagyu Ribeye 16oz
+            { variantId: "gid://shopify/ProductVariant/39900512813253", quantity: 1 }  // Australian Wagyu Filet Mignon
+          ],
+          appliedDiscount: {
+            value: 20,
+            valueType: "PERCENTAGE",
+            title: "WIN-BACK SPECIAL",
+            description: "20% off welcome back offer"
+          },
+          note: `Voicemail follow-up order for ${finalCustomerName} - 20% discount applied`,
+          tags: ["voicemail-followup", "grace-ai", "retell-generated"],
+          sourceName: "Grace AI Voicemail Follow-up",
+          visibleToCustomer: true
+        }
+      };
+
+      const response = await fetch(shopifyGraphqlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': shopifyAccessToken
+        },
+        body: JSON.stringify({
+          query: draftOrderMutation,
+          variables: variables
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.errors || data.data?.draftOrderCreate?.userErrors?.length > 0) {
+        throw new Error(data.errors?.[0]?.message || data.data?.draftOrderCreate?.userErrors?.[0]?.message || 'Failed to create draft order');
+      }
+
+      const draftOrder = data.data.draftOrderCreate.draftOrder;
+      
+      draftOrderResult = {
+        success: true,
+        draftOrderId: draftOrder.id,
+        checkoutUrl: draftOrder.invoiceUrl,
+        totalValue: parseFloat(draftOrder.totalPriceSet.shopMoney.amount),
+        originalValue: 422.29,
+        discountValue: 20
+      };
+      
+    } catch (draftOrderError) {
+      console.error('❌ Draft order creation failed:', draftOrderError.message);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to create draft order", 
+        details: draftOrderError.message,
+        speak: "I'm sorry, I had trouble creating your special offer. Let me try again later."
+      });
+    }
+
+    console.log('📧 Draft order created:', {
+      draftOrderId: draftOrderResult.draftOrderId,
+      checkoutUrl: draftOrderResult.checkoutUrl,
+      totalValue: draftOrderResult.totalValue,
+      originalValue: draftOrderResult.originalValue
     });
 
-    console.log('📧 Draft order created, sending voicemail event to Klaviyo');
+    console.log('📧 Sending voicemail event to Klaviyo with draft order details');
 
     // Send voicemail event to Klaviyo with draft order details
     const voicemailResult = await sendVoicemailLeftEvent({
@@ -1273,11 +1371,10 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
       customerName: finalCustomerName,
       callId: callData?.call_id || `manual-${Date.now()}`,
       transcript: callData?.transcript || message_left,
-      discountCode: draftOrderResult.discountCode,
       checkoutUrl: draftOrderResult.checkoutUrl,
-      originalValue: draftOrderResult.originalValue,
       totalValue: draftOrderResult.totalValue,
-      discountValue: draftOrderResult.discountPercentage,
+      originalValue: draftOrderResult.originalValue,
+      discountValue: 20,
       metadata: {
         source: callData?.metadata?.source || 'winback_campaign',
         customer_id: callData?.metadata?.customer_id || callData?.metadata?.winback_customer_id,
@@ -1290,6 +1387,18 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
 
     if (voicemailResult.success) {
       console.log(`✅ Voicemail follow-up event sent to Klaviyo for ${finalCustomerPhone || finalCustomerEmail}`);
+      
+      // Mark this call as having manual voicemail follow-up to prevent webhook duplicate
+      try {
+        const callId = callData?.call_id;
+        if (callId) {
+          global.processedVoicemails = global.processedVoicemails || new Set();
+          global.processedVoicemails.add(callId);
+          console.log(`🏷️ Marked call ${callId} as manually processed to prevent webhook duplicate`);
+        }
+      } catch (flagError) {
+        console.error('❌ Error setting voicemail flag:', flagError.message);
+      }
       
       res.json({
         success: true,
