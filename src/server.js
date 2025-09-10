@@ -1348,6 +1348,19 @@ app.post("/tools/create-win-back-draft-order", async (req, res) => {
       });
     }
 
+    // Send Klaviyo event to trigger SMS flow
+    const { sendWinBackDraftOrderEvent } = await import('./klaviyo-events-integration.js');
+    
+    const klaviyoResult = await sendWinBackDraftOrderEvent({
+      customerEmail: trimmedEmail,
+      customerPhone: normalizedPhone,
+      customerName: finalCustomerName,
+      draftOrderId: draftOrderResult.draftOrderId,
+      checkoutUrl: draftOrderResult.checkoutUrl,
+      discountValue: discount_value,
+      totalValue: draftOrderResult.totalValue
+    });
+
     // Success response with checkout URL
     const checkoutUrl = draftOrderResult.checkoutUrl;
     const totalValue = draftOrderResult.totalValue;
@@ -1355,6 +1368,7 @@ app.post("/tools/create-win-back-draft-order", async (req, res) => {
     console.log(`✅ Draft order created successfully: ${draftOrderResult.draftOrderId}`);
     console.log(`💰 Total value: $${totalValue}`);
     console.log(`🔗 Checkout URL: ${checkoutUrl}`);
+    console.log(`📱 Klaviyo event sent: ${klaviyoResult.success ? 'YES' : 'NO'}`);
 
     res.json({
       success: true,
@@ -1362,6 +1376,7 @@ app.post("/tools/create-win-back-draft-order", async (req, res) => {
       checkout_url: checkoutUrl,
       total_value: totalValue,
       discount_applied: discount_value,
+      klaviyo_event_sent: klaviyoResult.success,
       speak: `Perfect! I've created your order with ${discount_value}% off. The total comes to $${totalValue.toFixed(2)}. I'll text you the checkout link right now.`
     });
 

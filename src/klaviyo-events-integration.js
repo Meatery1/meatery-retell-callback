@@ -535,56 +535,98 @@ async function convertSKUsToVariantIds(skus) {
       throw new Error('Shopify credentials not configured');
     }
 
-    // Use a different query approach - search for products by SKU
-    const query = `
-      query getVariantsBySKU {
-        productVariants(first: 250) {
-          edges {
-            node {
-              id
-              sku
-              price
-              title
-              availableForSale
-              product {
+    // Search for each SKU individually using the search query
+    const skuToVariant = {};
+    
+    for (const sku of skus) {
+      const query = `
+        query getVariantBySKU($query: String!) {
+          productVariants(first: 10, query: $query) {
+            edges {
+              node {
+                id
+                sku
+                price
                 title
+                availableForSale
+                product {
+                  title
+                }
               }
             }
           }
         }
+      `;
+      
+      console.log(`🔍 Searching for SKU: ${sku} with query: sku:${sku}`);
+      
+      // Try both exact match and wildcard search
+      const queries = [
+        `sku:${sku}`,
+        `sku:*${sku.slice(-4)}*`, // Search for last 4 characters with wildcards
+        `sku:*${sku}*` // Wildcard search
+      ];
+      
+      let variant = null;
+      
+      for (const searchQuery of queries) {
+        console.log(`   Trying query: ${searchQuery}`);
+        
+        const response = await fetch(shopifyGraphqlEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': shopifyAccessToken
+          },
+          body: JSON.stringify({
+            query,
+            variables: { query: searchQuery }
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.errors) {
+          console.error(`❌ Error fetching variant for query ${searchQuery}:`, data.errors);
+          continue;
+        }
+
+        console.log(`📊 Search results for query ${searchQuery}: ${data.data?.productVariants?.edges?.length || 0} results`);
+        
+        if (data.data?.productVariants?.edges) {
+          data.data.productVariants.edges.forEach((edge, index) => {
+            console.log(`   Result ${index + 1}: SKU="${edge.node.sku}" Title="${edge.node.title}" Available=${edge.node.availableForSale}`);
+          });
+          
+          // Look for exact SKU match first, then any match containing the SKU
+          variant = data.data.productVariants.edges.find(edge => 
+            edge.node.sku === sku
+          )?.node;
+          
+          if (!variant && searchQuery.includes('*')) {
+            // For wildcard searches, look for partial matches
+            variant = data.data.productVariants.edges.find(edge => 
+              edge.node.sku && edge.node.sku.includes(sku.replace(/[PO]/g, match => match === 'P' ? '[PO]' : '[0O]'))
+            )?.node;
+          }
+        }
+        
+        if (variant) break;
       }
-    `;
-    
-    const response = await fetch(shopifyGraphqlEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': shopifyAccessToken
-      },
-      body: JSON.stringify({ query })
-    });
 
-    const data = await response.json();
-    
-    if (data.errors) {
-      console.error('❌ Error fetching variants by SKU:', data.errors);
-      return {};
-    }
-
-    // Create SKU to variant mapping
-    const skuToVariant = {};
-    data.data?.productVariants?.edges?.forEach(edge => {
-      const variant = edge.node;
-      if (variant.sku && skus.includes(variant.sku)) {
-        skuToVariant[variant.sku] = {
+      if (variant) {
+        skuToVariant[sku] = {
           variantId: variant.id,
           price: parseFloat(variant.price),
           title: variant.title,
           productTitle: variant.product?.title,
           availableForSale: variant.availableForSale
         };
+        console.log(`✅ Found SKU ${sku}: ${variant.product?.title} - ${variant.title} ($${variant.price})`);
+      } else {
+        console.log(`⚠️ SKU ${sku} not found in any search results`);
       }
-    });
+    }
 
     return skuToVariant;
   } catch (error) {
@@ -984,9 +1026,12 @@ export async function sendWinBackDraftOrderEvent({
         type: 'event',
         attributes: {
           properties: {
-            draft_order_id: draftOrderId,
-            checkout_url: checkoutUrl,
+            discount_code: 'WINBACK20', // Static code for the bundle offer
             discount_value: discountValue,
+            discount_type: 'percentage',
+            discount_text: `${discountValue}%`,
+            checkout_url: checkoutUrl,
+            draft_order_id: draftOrderId,
             total_value: totalValue,
             original_value: parseFloat((totalValue / (1 - discountValue/100)).toFixed(2)),
             campaign_type: 'win_back',
@@ -996,7 +1041,7 @@ export async function sendWinBackDraftOrderEvent({
             data: {
               type: 'metric',
               attributes: {
-                name: 'Grace Win-Back Draft Order' // ← Different event name!
+                name: 'Grace Discount Offered' // ← Use existing flow!
               }
             }
           },
