@@ -589,21 +589,27 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
         const transcript = data?.transcript || "";
         const orderNumber = m.order_number || structured.order_number;
         
+        // Always log webhook processing for debugging
+        console.log(`🔍 Processing webhook - type: ${type}, agent: ${data?.agent_id}, call_status: ${data?.call_status}`);
+        
         // Check for voicemail detection - trigger on any call end event
         const inVoicemail = analysis?.in_voicemail || structured?.in_voicemail;
         const contactOutcome = structured?.contact_outcome;
         const callStatus = data?.call_status;
+        const disconnectionReason = data?.disconnection_reason;
         
-        console.log(`🔍 Voicemail check - type: ${type}, inVoicemail: ${inVoicemail}, contactOutcome: ${contactOutcome}, callStatus: ${callStatus}`);
+        console.log(`🔍 Voicemail check - type: ${type}, inVoicemail: ${inVoicemail}, contactOutcome: ${contactOutcome}, callStatus: ${callStatus}, disconnection: ${disconnectionReason}`);
         
-        // Detect voicemail scenarios
+        // Detect voicemail scenarios - be more aggressive about detection
         const isVoicemail = inVoicemail === true || 
                           contactOutcome === 'voicemail_left' ||
+                          disconnectionReason === 'voicemail_reached' ||
                           transcript?.toLowerCase().includes('voicemail') ||
                           transcript?.toLowerCase().includes('leave a message') ||
-                          transcript?.toLowerCase().includes('at the tone');
+                          transcript?.toLowerCase().includes('at the tone') ||
+                          transcript?.toLowerCase().includes('record your message');
         
-        console.log(`🔍 Voicemail detected: ${isVoicemail}`);
+        console.log(`🔍 Voicemail detected: ${isVoicemail} (transcript check: ${transcript?.toLowerCase().includes('voicemail')})`);
         
         if (isVoicemail && (type === "call_analyzed" || type === "call_ended" || callStatus === 'ended')) {
           console.log('📧 Voicemail detected - sending Klaviyo event for SMS follow-up');
@@ -1186,6 +1192,111 @@ app.post("/tools/check-discount-eligibility", async (req, res) => {
       eligible: true, // Default to eligible if check fails
       reason: 'default',
       error: error.message 
+    });
+  }
+});
+
+// --- Voicemail Follow-up endpoint for Retell custom tools ---
+app.post("/tools/send-voicemail-followup", async (req, res) => {
+  try {
+    console.log('📧 Voicemail follow-up request:', {
+      body: req.body,
+      args: req.body?.args,
+      call: req.body?.call
+    });
+
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    
+    // Get the call context from Retell
+    const callData = req.body?.call || {};
+    
+    // Extract customer phone from call context
+    let customerPhoneFromCall = null;
+    if (callData?.direction === 'outbound') {
+      customerPhoneFromCall = callData?.to_number;  // Customer is the recipient
+    } else if (callData?.direction === 'inbound') {
+      customerPhoneFromCall = callData?.from_number;  // Customer is the caller
+    }
+    
+    // Get customer info from various sources
+    const { 
+      customer_phone,
+      customer_name,
+      customer_email,
+      message_left = "I left you a voicemail about a special offer"
+    } = params;
+
+    const finalCustomerPhone = customer_phone || 
+                               customerPhoneFromCall || 
+                               callData?.retell_llm_dynamic_variables?.customer_phone ||
+                               callData?.metadata?.customer_phone;
+
+    const finalCustomerName = customer_name || 
+                             callData?.retell_llm_dynamic_variables?.customer_name || 
+                             callData?.metadata?.customer_name || 
+                             "Valued Customer";
+
+    const finalCustomerEmail = customer_email || 
+                              callData?.retell_llm_dynamic_variables?.customer_email ||
+                              callData?.metadata?.customer_email;
+
+    if (!finalCustomerPhone && !finalCustomerEmail) {
+      return res.json({
+        success: false,
+        error: "No customer contact information provided",
+        speak: "I need either a phone number or email address to send the follow-up."
+      });
+    }
+
+    console.log('📧 Sending voicemail follow-up event:', {
+      phone: finalCustomerPhone,
+      name: finalCustomerName,
+      email: finalCustomerEmail
+    });
+
+    // Send voicemail event to Klaviyo
+    const voicemailResult = await sendVoicemailLeftEvent({
+      customerEmail: finalCustomerEmail,
+      customerPhone: finalCustomerPhone,
+      customerName: finalCustomerName,
+      callId: callData?.call_id,
+      transcript: callData?.transcript || message_left,
+      metadata: {
+        source: callData?.metadata?.source || 'winback_campaign',
+        customer_id: callData?.metadata?.customer_id || callData?.metadata?.winback_customer_id,
+        days_since_last_order: callData?.metadata?.days_since_last_order,
+        total_spent: callData?.metadata?.total_spent,
+        winback_customer_id: callData?.metadata?.winback_customer_id
+      }
+    });
+
+    if (voicemailResult.success) {
+      console.log(`✅ Voicemail follow-up event sent to Klaviyo for ${finalCustomerPhone || finalCustomerEmail}`);
+      
+      res.json({
+        success: true,
+        event_sent: true,
+        to: finalCustomerPhone || finalCustomerEmail,
+        message: "Voicemail follow-up event sent to Klaviyo",
+        speak: "Perfect! I've noted that I left you a voicemail and you'll receive a follow-up text shortly."
+      });
+    } else {
+      console.error('❌ Failed to send voicemail follow-up event:', voicemailResult.error);
+      
+      res.json({
+        success: false,
+        error: voicemailResult.error,
+        speak: "I left you a voicemail, but I'm having trouble with our follow-up system right now."
+      });
+    }
+
+  } catch (error) {
+    console.error('Error in /tools/send-voicemail-followup:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      speak: "I left you a voicemail, but there was an issue with our follow-up system."
     });
   }
 });
