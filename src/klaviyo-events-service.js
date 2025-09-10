@@ -121,12 +121,22 @@ export async function sendVoicemailLeftEvent({
   customerName,
   callId,
   transcript,
-  metadata = {}
+  metadata = {},
+  discountValue = 20,
+  checkoutUrl = null,
+  totalValue = null,
+  originalValue = null
 }) {
   const klaviyoApiKey = process.env.KLAVIYO_API_KEY || process.env.KLAVIYO_PRIVATE_KEY;
   if (!klaviyoApiKey) {
     throw new Error('Klaviyo API key not configured');
   }
+
+  // Calculate values if not provided
+  const finalDiscountValue = discountValue || 20;
+  const finalOriginalValue = originalValue || (totalValue ? (totalValue / (1 - finalDiscountValue/100)) : 422);
+  const finalTotalValue = totalValue || (finalOriginalValue * (1 - finalDiscountValue/100));
+  const finalCheckoutUrl = checkoutUrl || `https://themeatery.com/?utm_source=grace_voicemail&discount=WINBACK${finalDiscountValue}`;
 
   try {
     // Send event to trigger voicemail follow-up flow
@@ -142,7 +152,13 @@ export async function sendVoicemailLeftEvent({
             customer_id: metadata.customer_id,
             days_since_last_order: metadata.days_since_last_order,
             total_spent: metadata.total_spent,
-            winback_customer_id: metadata.winback_customer_id
+            winback_customer_id: metadata.winback_customer_id,
+            // Add discount and checkout info for SMS template
+            discount_value: finalDiscountValue,
+            original_value: finalOriginalValue,
+            total_value: finalTotalValue,
+            checkout_url: finalCheckoutUrl,
+            discount_text: `${finalDiscountValue}%`
           },
           metric: {
             data: {
