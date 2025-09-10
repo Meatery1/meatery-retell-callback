@@ -668,9 +668,10 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
             const customerPhone = m.customer_phone || structured.customer_phone || customerPhoneFromCall;
             const customerName = m.customer_name || structured.customer_name || "Valued Customer";
             const customerEmail = m.customer_email || structured.customer_email;
+            const agentId = data?.agent_id;
             
             if (customerPhone) {
-              console.log(`📱 Sending discount SMS to ${customerPhone}...`);
+              console.log(`📱 Sending discount for agent ${agentId} to ${customerPhone}...`);
               
               try {
                 // Cap discount at 20% maximum
@@ -680,20 +681,32 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
                   discountValue = 20;
                 }
                 
-                        const discountResult = await createAndSendKlaviyoDiscount({
-          customerEmail: customerEmail || customerPhone, // Use email if available, fallback to phone
-          customerName,
-          customerPhone,
-          discountType: 'percentage',
-          discountValue: discountValue,
-          reason: structured.discount_reason || 'customer_service',
-          orderNumber,
-          abandonedCheckoutId: m.checkout_id || structured.checkout_id || null,
-          preferredChannel: customerPhone ? 'sms' : 'email'
-        });
+                // Check which agent is sending the discount to fire the correct event
+                const isWinBackAgent = agentId === 'agent_9dfa2b728cd32e308633bfd9df'; // Grace win-back agent
+                const isAbandonedCheckoutAgent = agentId === 'agent_e2636fcbe1c89a7f6bd0731e11'; // Grace abandoned checkout agent
                 
-                if (discountResult.success) {
-                  console.log(`✅ Discount sent: ${discountResult.discount.code}`);
+                if (isWinBackAgent && m.source === 'winback_campaign') {
+                  // Win-back agent should use the draft order flow, not discount flow
+                  console.log(`🎯 Win-back agent detected - using draft order flow instead of discount`);
+                  // Don't send discount here - let the agent use the send_winback_draft_order tool instead
+                  console.log(`ℹ️ Skipping automatic discount for win-back agent - should use draft order tool`);
+                } else {
+                  // Regular discount flow for other agents
+                  const discountResult = await createAndSendKlaviyoDiscount({
+                    customerEmail: customerEmail || customerPhone, // Use email if available, fallback to phone
+                    customerName,
+                    customerPhone,
+                    discountType: 'percentage',
+                    discountValue: discountValue,
+                    reason: structured.discount_reason || 'customer_service',
+                    orderNumber,
+                    abandonedCheckoutId: m.checkout_id || structured.checkout_id || null,
+                    preferredChannel: customerPhone ? 'sms' : 'email'
+                  });
+                  
+                  if (discountResult.success) {
+                    console.log(`✅ Discount sent: ${discountResult.discountCode || discountResult.discount?.code}`);
+                  }
                 }
               } catch (err) {
                 console.error(`❌ Failed to send discount:`, err.message);

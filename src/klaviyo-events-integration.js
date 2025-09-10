@@ -1041,7 +1041,7 @@ export async function sendWinBackDraftOrderEvent({
             data: {
               type: 'metric',
               attributes: {
-                name: 'Grace Discount Offered' // ← Use existing flow!
+                name: 'Grace Win-Back Draft Order'
               }
             }
           },
