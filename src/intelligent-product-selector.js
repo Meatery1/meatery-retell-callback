@@ -325,7 +325,7 @@ function adjustQuantitiesForTarget(recommendations, targetAmount) {
     return recommendations;
   }
   
-  // If we need more, add quantities intelligently
+  // If we need more, add quantities aggressively to reach target
   if (currentTotal < targetAmount) {
     const remainingAmount = targetAmount - currentTotal;
     console.log(`Need $${remainingAmount.toFixed(2)} more`);
@@ -334,11 +334,11 @@ function adjustQuantitiesForTarget(recommendations, targetAmount) {
     const sorted = [...recommendations].sort((a, b) => b.price - a.price);
     
     for (const item of sorted) {
-      if (currentTotal >= targetAmount * 0.95) break; // Within 5% is good enough
+      if (currentTotal >= targetAmount * 0.9) break; // Within 10% is acceptable
       
       const additionalQty = Math.floor((targetAmount - currentTotal) / item.price);
-      if (additionalQty > 0 && item.quantity < 3) { // Don't go crazy with quantities
-        const qtyToAdd = Math.min(additionalQty, 2); // Max 2 additional of any item
+      if (additionalQty > 0 && item.quantity < 6) { // Allow up to 6 of any item
+        const qtyToAdd = Math.min(additionalQty, 4); // Max 4 additional of any item
         item.quantity += qtyToAdd;
         currentTotal += item.price * qtyToAdd;
         
