@@ -122,6 +122,7 @@ export async function sendVoicemailLeftEvent({
   callId,
   transcript,
   metadata = {},
+  discountCode = null,
   discountValue = 20,
   checkoutUrl = null,
   totalValue = null,
@@ -136,7 +137,7 @@ export async function sendVoicemailLeftEvent({
   const finalDiscountValue = discountValue || 20;
   const finalOriginalValue = originalValue || (totalValue ? (totalValue / (1 - finalDiscountValue/100)) : 422);
   const finalTotalValue = totalValue || (finalOriginalValue * (1 - finalDiscountValue/100));
-  const finalCheckoutUrl = checkoutUrl || `https://themeatery.com/?utm_source=grace_voicemail&discount=WINBACK${finalDiscountValue}`;
+  const finalCheckoutUrl = checkoutUrl || `https://themeatery.com/checkout?discount=${discountCode || `WINBACK${finalDiscountValue}`}&utm_source=grace_voicemail&utm_medium=sms&utm_campaign=voicemail_followup`;
 
   try {
     // Send event to trigger voicemail follow-up flow

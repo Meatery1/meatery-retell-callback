@@ -611,7 +611,7 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
         
         console.log(`🔍 Voicemail detected: ${isVoicemail} (transcript check: ${transcript?.toLowerCase().includes('voicemail')})`);
         
-        if (isVoicemail && (type === "call_analyzed" || type === "call_ended" || callStatus === 'ended')) {
+        if (isVoicemail && type === "call_analyzed") {
           console.log('📧 Voicemail detected - sending Klaviyo event for SMS follow-up');
           
           // Extract customer info from call data
@@ -1249,25 +1249,42 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
       });
     }
 
-    console.log('📧 Creating Klaviyo voicemail event:', {
+    console.log('📧 Creating voicemail draft order for:', {
       phone: finalCustomerPhone,
       name: finalCustomerName,
       email: finalCustomerEmail
     });
 
-    // Send voicemail event directly to Klaviyo
+    // Create draft order with specific products (like win-back function)
+    const draftOrderResult = await createWinBackDraftOrder({
+      customerPhone: finalCustomerPhone,
+      customerName: finalCustomerName,
+      customerEmail: finalCustomerEmail,
+      discountPercentage: 20,
+      channel: 'sms'
+    });
+
+    console.log('📧 Draft order created, sending voicemail event to Klaviyo');
+
+    // Send voicemail event to Klaviyo with draft order details
     const voicemailResult = await sendVoicemailLeftEvent({
       customerEmail: finalCustomerEmail,
       customerPhone: finalCustomerPhone,
       customerName: finalCustomerName,
       callId: callData?.call_id || `manual-${Date.now()}`,
       transcript: callData?.transcript || message_left,
+      discountCode: draftOrderResult.discountCode,
+      checkoutUrl: draftOrderResult.checkoutUrl,
+      originalValue: draftOrderResult.originalValue,
+      totalValue: draftOrderResult.totalValue,
+      discountValue: draftOrderResult.discountPercentage,
       metadata: {
         source: callData?.metadata?.source || 'winback_campaign',
         customer_id: callData?.metadata?.customer_id || callData?.metadata?.winback_customer_id,
         days_since_last_order: callData?.metadata?.days_since_last_order,
         total_spent: callData?.metadata?.total_spent,
-        winback_customer_id: callData?.metadata?.winback_customer_id
+        winback_customer_id: callData?.metadata?.winback_customer_id,
+        draft_order_id: draftOrderResult.draftOrderId
       }
     });
 
