@@ -935,14 +935,26 @@ export async function sendWinBackDraftOrderEvent({
       headers: {
         'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
         'Content-Type': 'application/json',
-        'revision': '2024-10-15'
+        'revision': '2025-01-15'
       },
       body: JSON.stringify(eventData)
     });
 
     if (!response.ok) {
       const errorData = await response.text();
-      throw new Error(`Klaviyo API error: ${response.status} - ${errorData}`);
+      console.error('🚨 Klaviyo API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        errorData: errorData,
+        requestUrl: 'https://a.klaviyo.com/api/events/',
+        requestHeaders: {
+          'Authorization': `Klaviyo-API-Key ${klaviyoApiKey ? klaviyoApiKey.substring(0, 10) + '...' : 'MISSING'}`,
+          'Content-Type': 'application/json',
+          'revision': '2025-01-15'
+        }
+      });
+      throw new Error(`Klaviyo API error: ${response.status} ${response.statusText} - ${errorData}`);
     }
 
     console.log(`✅ Win-back draft order event sent to Klaviyo`);
@@ -956,9 +968,15 @@ export async function sendWinBackDraftOrderEvent({
 
   } catch (error) {
     console.error('❌ Error sending win-back draft order event:', error);
+    console.error('❌ Klaviyo connection failed - SMS will not be sent');
+    
+    // Return success:false so the calling function knows to handle this
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      klaviyoFailed: true,
+      draftOrderId: draftOrderId, // Still return the draft order ID
+      checkoutUrl: checkoutUrl     // Still return the checkout URL
     };
   }
 }

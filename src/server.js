@@ -1239,10 +1239,14 @@ app.post("/tools/send-winback-draft-order", async (req, res) => {
         speak: speakMessage
       });
     } else {
+      // Klaviyo failed - this is a system error that needs to be fixed
+      console.log('🚨 Klaviyo API failure - SMS cannot be sent');
+      
       res.json({
         success: false,
         error: klaviyoResult.error,
-        speak: "I created your draft order but I'm having trouble sending the notification. Let me have someone follow up with you directly."
+        klaviyo_failed: true,
+        speak: "I'm having trouble with our notification system right now. Let me have someone from our team call you back within the hour to complete this order."
       });
     }
 
