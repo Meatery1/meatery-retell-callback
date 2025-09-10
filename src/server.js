@@ -1243,13 +1243,22 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
 
     const finalCustomerName = customer_name || 
                              callData?.retell_llm_dynamic_variables?.customer_name || 
-                             callData?.metadata?.customer_name || 
+                             callData?.metadata?.customer_name ||
+                             callData?.metadata?.winback_customer_name ||
                              "Valued Customer";
 
-    const finalCustomerEmail = customer_email || 
-                              callData?.retell_llm_dynamic_variables?.customer_email ||
-                              callData?.metadata?.customer_email ||
-                              `customer${finalCustomerPhone?.replace(/[^\d]/g, '')}@placeholder.com`; // Generate placeholder email if none provided
+    // For draft orders, we need a real email - use customer's actual email or create a proper placeholder
+    let finalCustomerEmail = customer_email || 
+                             callData?.retell_llm_dynamic_variables?.customer_email ||
+                             callData?.metadata?.customer_email ||
+                             callData?.metadata?.winback_customer_email;
+    
+    // If no email provided, create a placeholder that won't conflict with your account
+    if (!finalCustomerEmail) {
+      const phoneDigits = finalCustomerPhone?.replace(/[^\d]/g, '') || 'unknown';
+      const nameSlug = finalCustomerName?.toLowerCase().replace(/[^a-z]/g, '') || 'customer';
+      finalCustomerEmail = `${nameSlug}.${phoneDigits}@customer.themeatery.com`;
+    }
 
     if (!finalCustomerPhone && !finalCustomerEmail) {
       return res.json({
