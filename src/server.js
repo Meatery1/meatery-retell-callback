@@ -621,7 +621,7 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
             return;
           }
           
-          console.log('📧 Voicemail detected - sending Klaviyo event for SMS follow-up');
+          console.log('📧 Voicemail detected - creating Shopify Draft Order FIRST, then sending Klaviyo event for SMS follow-up');
           
           // Extract customer info from call data
           let customerPhone = null;
@@ -643,9 +643,47 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
           customerEmail = m.customer_email || 
                          data?.retell_llm_dynamic_variables?.customer_email;
           
-          console.log(`📧 Sending voicemail event for: ${customerName} (${customerPhone || customerEmail})`);
+          // If no email provided, create a placeholder that won't conflict with your account
+          if (!customerEmail) {
+            const phoneDigits = customerPhone?.replace(/[^\d]/g, '') || 'unknown';
+            const nameSlug = customerName?.toLowerCase().replace(/[^a-z]/g, '') || 'customer';
+            customerEmail = `${nameSlug}.${phoneDigits}@customer.themeatery.com`;
+          }
           
-          // Send voicemail event to Klaviyo
+          console.log(`📧 Processing voicemail for: ${customerName} (${customerPhone})`);
+          
+          // STEP 1: Create Shopify Draft Order FIRST
+          let draftOrderResult = null;
+          try {
+            console.log('🛒 Creating Shopify Draft Order for voicemail customer...');
+            
+            // Use the exact same logic as the working manual voicemail endpoint
+            draftOrderResult = await createWinBackDraftOrder({
+              customerEmail,
+              customerPhone: customerPhone ? normalizeToE164(customerPhone) : null,
+              customerName,
+              productVariants: [
+                "gid://shopify/ProductVariant/46769584308440", // Japanese A5 Wagyu Ribeye
+                "gid://shopify/ProductVariant/46769584341208", // Japanese A5 Wagyu Filet Mignon  
+                "gid://shopify/ProductVariant/46769584046296", // Australian Wagyu Ribeye
+                "gid://shopify/ProductVariant/46769584079064"  // Australian Wagyu Filet Mignon
+              ],
+              discountValue: 20,
+              targetAmount: 422
+            });
+
+            if (draftOrderResult.success) {
+              console.log(`✅ Draft Order created successfully: ${draftOrderResult.draftOrderId}`);
+              console.log(`💰 Order value: $${draftOrderResult.totalValue} (was $${draftOrderResult.originalValue || 422})`);
+            } else {
+              console.error('❌ Failed to create draft order:', draftOrderResult.error);
+            }
+          } catch (draftOrderError) {
+            console.error('❌ Error creating voicemail draft order:', draftOrderError.message);
+            console.error('❌ Draft order error details:', draftOrderError);
+          }
+          
+          // STEP 2: Send voicemail event to Klaviyo (with draft order details if available)
           try {
             await sendVoicemailLeftEvent({
               customerEmail,
@@ -653,12 +691,17 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
               customerName,
               callId: data?.call_id,
               transcript,
+              checkoutUrl: draftOrderResult?.checkoutUrl,
+              totalValue: draftOrderResult?.totalValue,
+              originalValue: draftOrderResult?.originalValue || 422,
+              discountValue: 20,
               metadata: {
                 source: m.source || 'winback_campaign',
                 customer_id: m.customer_id || m.winback_customer_id,
                 days_since_last_order: m.days_since_last_order,
                 total_spent: m.total_spent,
-                winback_customer_id: m.winback_customer_id
+                winback_customer_id: m.winback_customer_id,
+                draft_order_id: draftOrderResult?.draftOrderId
               }
             });
             
