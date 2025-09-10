@@ -1248,7 +1248,8 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
 
     const finalCustomerEmail = customer_email || 
                               callData?.retell_llm_dynamic_variables?.customer_email ||
-                              callData?.metadata?.customer_email;
+                              callData?.metadata?.customer_email ||
+                              `customer${finalCustomerPhone?.replace(/[^\d]/g, '')}@placeholder.com`; // Generate placeholder email if none provided
 
     if (!finalCustomerPhone && !finalCustomerEmail) {
       return res.json({
@@ -1330,11 +1331,20 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
 
       const data = await response.json();
       
+      console.log('📊 Shopify API Response:', JSON.stringify(data, null, 2));
+      
       if (data.errors || data.data?.draftOrderCreate?.userErrors?.length > 0) {
-        throw new Error(data.errors?.[0]?.message || data.data?.draftOrderCreate?.userErrors?.[0]?.message || 'Failed to create draft order');
+        const errorMsg = data.errors?.[0]?.message || data.data?.draftOrderCreate?.userErrors?.[0]?.message || 'Failed to create draft order';
+        console.error('❌ Shopify API Error:', errorMsg);
+        throw new Error(errorMsg);
       }
 
       const draftOrder = data.data.draftOrderCreate.draftOrder;
+      
+      if (!draftOrder) {
+        console.error('❌ No draft order returned from Shopify');
+        throw new Error('No draft order returned from Shopify API');
+      }
       
       draftOrderResult = {
         success: true,
