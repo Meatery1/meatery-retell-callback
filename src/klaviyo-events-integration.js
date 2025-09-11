@@ -983,6 +983,13 @@ export async function createWinBackDraftOrder({
       console.log(`ℹ️ Draft order created without customer association`);
     }
     
+    // Determine the best email to use for invoice
+    const invoiceEmail = (draftOrder.customer?.email && draftOrder.customer.email.includes('@')) 
+      ? draftOrder.customer.email 
+      : customerEmail;
+    
+    console.log(`📧 Sending invoice to: ${invoiceEmail} (${invoiceEmail === draftOrder.customer?.email ? 'real customer email' : 'placeholder email'})`);
+    
     // Send invoice email via Shopify
     const invoiceMutation = `
       mutation draftOrderInvoiceSend($id: ID!, $email: EmailInput) {
@@ -1003,7 +1010,7 @@ export async function createWinBackDraftOrder({
     const invoiceVariables = {
       id: draftOrder.id,
       email: {
-        to: customerEmail,
+        to: invoiceEmail,
         subject: `Your Special 20% Off Order is Ready - The Meatery`,
         customMessage: `Hi ${customerName}! We've prepared a special order just for you with 20% off. Click the link below to complete your purchase.`
       }
@@ -1022,13 +1029,14 @@ export async function createWinBackDraftOrder({
     });
 
     console.log(`✅ Draft order created: ${draftOrder.id}`);
-    console.log(`📧 Invoice sent to: ${customerEmail}`);
+    console.log(`📧 Invoice sent to: ${invoiceEmail}`);
     
     return {
       success: true,
       draftOrderId: draftOrder.id,
       checkoutUrl: draftOrder.invoiceUrl,
       totalValue: parseFloat(draftOrder.totalPriceSet.shopMoney.amount),
+      customerEmail: draftOrder.customer?.email || customerEmail, // Return real customer email if available
       orderContext: orderContext, // Include whether we used customer history
       summary: `Draft order ${draftOrder.name} created with ${discountValue}% discount${orderContext.usedHistory ? ' using customer favorites' : ''}`
     };

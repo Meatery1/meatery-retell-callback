@@ -140,6 +140,16 @@ export async function sendVoicemailLeftEvent({
   const finalCheckoutUrl = checkoutUrl || `https://themeatery.com/checkout?discount=${discountCode || `WINBACK${finalDiscountValue}`}&utm_source=grace_voicemail&utm_medium=sms&utm_campaign=voicemail_followup`;
 
   try {
+    console.log(`🔍 Klaviyo voicemail event details:`, {
+      customerEmail,
+      customerPhone, 
+      customerName,
+      callId,
+      checkoutUrl,
+      totalValue,
+      originalValue: finalOriginalValue
+    });
+    
     // Send event to trigger voicemail follow-up flow
     const eventData = {
       data: {
@@ -159,7 +169,9 @@ export async function sendVoicemailLeftEvent({
             original_value: finalOriginalValue,
             total_value: finalTotalValue,
             checkout_url: finalCheckoutUrl,
-            discount_text: `${finalDiscountValue}%`
+            discount_text: `${finalDiscountValue}%`,
+            // Add draft order details
+            draft_order_id: metadata.draft_order_id
           },
           metric: {
             data: {
@@ -195,6 +207,8 @@ export async function sendVoicemailLeftEvent({
         }
       }
     };
+    
+    console.log(`📤 Sending Klaviyo event payload:`, JSON.stringify(eventData, null, 2));
 
     const response = await axios.post('https://a.klaviyo.com/api/events/', eventData, {
       headers: {
@@ -205,6 +219,7 @@ export async function sendVoicemailLeftEvent({
     });
 
     console.log(`✅ Klaviyo voicemail event sent for ${customerPhone || customerEmail}`);
+    console.log(`📊 Klaviyo API response:`, JSON.stringify(response.data, null, 2));
     
     return {
       success: true,

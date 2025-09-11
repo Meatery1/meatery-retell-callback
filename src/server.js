@@ -654,6 +654,8 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
           
           // STEP 1: Create Shopify Draft Order FIRST
           let draftOrderResult = null;
+          let realCustomerEmail = customerEmail; // Start with placeholder, will update if we find real customer
+          
           try {
             console.log('🛒 Creating Shopify Draft Order for voicemail customer...');
             
@@ -671,6 +673,12 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
               discountValue: 20,
               targetAmount: 422
             });
+            
+            // If draft order was created and has a real customer email, use that for Klaviyo
+            if (draftOrderResult?.success && draftOrderResult?.customerEmail) {
+              realCustomerEmail = draftOrderResult.customerEmail;
+              console.log(`📧 Using real customer email for Klaviyo: ${realCustomerEmail}`);
+            }
 
             if (draftOrderResult.success) {
               console.log(`✅ Draft Order created successfully: ${draftOrderResult.draftOrderId}`);
@@ -685,8 +693,10 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
           
           // STEP 2: Send voicemail event to Klaviyo (with draft order details if available)
           try {
+            console.log(`📧 Sending Klaviyo event to: ${realCustomerEmail} (${realCustomerEmail !== customerEmail ? 'real email' : 'placeholder'})`);
+            
             await sendVoicemailLeftEvent({
-              customerEmail,
+              customerEmail: realCustomerEmail,
               customerPhone,
               customerName,
               callId: data?.call_id,
@@ -1467,9 +1477,13 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
 
     console.log('📧 Sending voicemail event to Klaviyo with draft order details');
 
+    // Use real customer email if available from draft order result
+    const klaviyoEmail = draftOrderResult?.customerEmail || finalCustomerEmail;
+    console.log(`📧 Klaviyo event email: ${klaviyoEmail} (${klaviyoEmail !== finalCustomerEmail ? 'real customer email' : 'placeholder'})`);
+
     // Send voicemail event to Klaviyo with draft order details
     const voicemailResult = await sendVoicemailLeftEvent({
-      customerEmail: finalCustomerEmail,
+      customerEmail: klaviyoEmail,
       customerPhone: finalCustomerPhone,
       customerName: finalCustomerName,
       callId: callData?.call_id || `manual-${Date.now()}`,
