@@ -673,7 +673,7 @@ export async function createWinBackDraftOrder({
       
       if (customer) {
         customerGid = getCustomerGid(customer);
-        console.log(`👤 Customer for draft order: ${customer.display_name || customer.email || customer.phone} (${customerGid})`);
+        console.log(`👤 Customer for draft order: ${customer.displayName || customer.email || customer.phone} (${customerGid})`);
       } else {
         console.log('⚠️ No customer association - draft order will be created without customer');
       }

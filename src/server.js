@@ -643,11 +643,11 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
           customerEmail = m.customer_email || 
                          data?.retell_llm_dynamic_variables?.customer_email;
           
-          // If no email provided, create a placeholder that won't conflict with your account
+          // If no email provided, create a placeholder with a valid domain
           if (!customerEmail) {
             const phoneDigits = customerPhone?.replace(/[^\d]/g, '') || 'unknown';
             const nameSlug = customerName?.toLowerCase().replace(/[^a-z]/g, '') || 'customer';
-            customerEmail = `${nameSlug}.${phoneDigits}@customer.themeatery.com`;
+            customerEmail = `${nameSlug}.${phoneDigits}@example.com`;
           }
           
           console.log(`📧 Processing voicemail for: ${customerName} (${customerPhone})`);
@@ -1296,11 +1296,11 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
                              callData?.metadata?.customer_email ||
                              callData?.metadata?.winback_customer_email;
     
-    // If no email provided, create a placeholder that won't conflict with your account
+    // If no email provided, create a placeholder with a valid domain
     if (!finalCustomerEmail) {
       const phoneDigits = finalCustomerPhone?.replace(/[^\d]/g, '') || 'unknown';
       const nameSlug = finalCustomerName?.toLowerCase().replace(/[^a-z]/g, '') || 'customer';
-      finalCustomerEmail = `${nameSlug}.${phoneDigits}@customer.themeatery.com`;
+      finalCustomerEmail = `${nameSlug}.${phoneDigits}@example.com`;
     }
 
     if (!finalCustomerPhone && !finalCustomerEmail) {
@@ -1337,7 +1337,7 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
         
         if (customer) {
           customerGid = getCustomerGid(customer);
-          console.log(`👤 Customer for voicemail draft order: ${customer.display_name || customer.email || customer.phone} (${customerGid})`);
+          console.log(`👤 Customer for voicemail draft order: ${customer.displayName || customer.email || customer.phone} (${customerGid})`);
         }
       } catch (error) {
         console.error('⚠️ Customer lookup/creation failed for voicemail, proceeding without customer:', error.message);

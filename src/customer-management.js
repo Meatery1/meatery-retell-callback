@@ -1,33 +1,67 @@
 /**
  * Customer management utilities for Shopify integration
  * Handles customer creation, lookup, and association with draft orders
+ * Uses GraphQL exclusively for all Shopify operations
  */
 
-import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 /**
- * Find existing customer by email
+ * Find existing customer by email using GraphQL
  */
 export async function findCustomerByEmail(email) {
   if (!email || !email.includes('@')) return null;
   
-  try {
-    const response = await axios.get(
-      `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers/search.json`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN
-        },
-        params: {
-          query: `email:${email}`
+  const shopifyGraphqlEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-07/graphql.json`;
+  const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN;
+  
+  if (!shopifyAccessToken || !process.env.SHOPIFY_STORE_DOMAIN) {
+    console.error('Shopify credentials not configured');
+    return null;
+  }
+  
+  const customerSearchQuery = `
+    query findCustomerByEmail($query: String!) {
+      customers(first: 1, query: $query) {
+        nodes {
+          id
+          firstName
+          lastName
+          displayName
+          email
+          phone
+          createdAt
+          updatedAt
         }
       }
-    );
+    }
+  `;
+  
+  try {
+    const response = await fetch(shopifyGraphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyAccessToken
+      },
+      body: JSON.stringify({
+        query: customerSearchQuery,
+        variables: {
+          query: `email:${email}`
+        }
+      })
+    });
     
-    const customers = response.data.customers || [];
+    const data = await response.json();
+    
+    if (data.errors) {
+      console.error('GraphQL error finding customer by email:', data.errors);
+      return null;
+    }
+    
+    const customers = data.data?.customers?.nodes || [];
     return customers.length > 0 ? customers[0] : null;
   } catch (error) {
     console.error('Error finding customer by email:', error.message);
@@ -36,26 +70,60 @@ export async function findCustomerByEmail(email) {
 }
 
 /**
- * Find existing customer by phone
+ * Find existing customer by phone using GraphQL
  */
 export async function findCustomerByPhone(phoneRaw) {
   if (!phoneRaw) return null;
   
-  try {
-    const phone = String(phoneRaw).replace(/[^\d+]/g, "");
-    const response = await axios.get(
-      `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers/search.json`,
-      {
-        headers: { 
-          'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN 
-        },
-        params: { 
-          query: `phone:${phone}` 
+  const shopifyGraphqlEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-07/graphql.json`;
+  const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN;
+  
+  if (!shopifyAccessToken || !process.env.SHOPIFY_STORE_DOMAIN) {
+    console.error('Shopify credentials not configured');
+    return null;
+  }
+  
+  const customerSearchQuery = `
+    query findCustomerByPhone($query: String!) {
+      customers(first: 1, query: $query) {
+        nodes {
+          id
+          firstName
+          lastName
+          displayName
+          email
+          phone
+          createdAt
+          updatedAt
         }
       }
-    );
+    }
+  `;
+  
+  try {
+    const phone = String(phoneRaw).replace(/[^\d+]/g, "");
+    const response = await fetch(shopifyGraphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyAccessToken
+      },
+      body: JSON.stringify({
+        query: customerSearchQuery,
+        variables: {
+          query: `phone:${phone}`
+        }
+      })
+    });
     
-    const customers = response.data.customers || [];
+    const data = await response.json();
+    
+    if (data.errors) {
+      console.error('GraphQL error finding customer by phone:', data.errors);
+      return null;
+    }
+    
+    const customers = data.data?.customers?.nodes || [];
     return customers.length > 0 ? customers[0] : null;
   } catch (error) {
     console.error('Error finding customer by phone:', error.message);
@@ -152,7 +220,7 @@ export async function findOrCreateCustomer({ email, phone, name }) {
   if (email && email.includes('@')) {
     customer = await findCustomerByEmail(email);
     if (customer) {
-      console.log(`✅ Found existing customer by email: ${customer.id} - ${customer.display_name || customer.email}`);
+      console.log(`✅ Found existing customer by email: ${customer.id} - ${customer.displayName || customer.email}`);
       return customer;
     }
   }
@@ -161,7 +229,7 @@ export async function findOrCreateCustomer({ email, phone, name }) {
   if (phone && !customer) {
     customer = await findCustomerByPhone(phone);
     if (customer) {
-      console.log(`✅ Found existing customer by phone: ${customer.id} - ${customer.display_name || customer.phone}`);
+      console.log(`✅ Found existing customer by phone: ${customer.id} - ${customer.displayName || customer.phone}`);
       return customer;
     }
   }
@@ -188,16 +256,15 @@ export async function findOrCreateCustomer({ email, phone, name }) {
         lastName
       });
       
-      // Convert GraphQL customer format to REST format for consistency
+      // Return GraphQL customer format consistently
       return {
-        id: newCustomer.id.replace('gid://shopify/Customer/', ''),
+        id: newCustomer.id,
         email: newCustomer.email,
         phone: newCustomer.phone,
-        first_name: newCustomer.firstName,
-        last_name: newCustomer.lastName,
-        display_name: newCustomer.displayName,
-        created_at: newCustomer.createdAt,
-        gid: newCustomer.id // Keep the full GraphQL ID for draft orders
+        firstName: newCustomer.firstName,
+        lastName: newCustomer.lastName,
+        displayName: newCustomer.displayName,
+        createdAt: newCustomer.createdAt
       };
     } catch (error) {
       console.error('❌ Failed to create customer:', error.message);
@@ -206,6 +273,7 @@ export async function findOrCreateCustomer({ email, phone, name }) {
     }
   }
   
+  // All customers from GraphQL already have the correct ID format
   return customer;
 }
 
@@ -215,17 +283,12 @@ export async function findOrCreateCustomer({ email, phone, name }) {
 export function getCustomerGid(customer) {
   if (!customer) return null;
   
-  // If already in GraphQL format, return as-is
-  if (customer.gid && customer.gid.startsWith('gid://shopify/Customer/')) {
-    return customer.gid;
-  }
-  
-  // If we have the full GraphQL ID in the id field
-  if (customer.id && customer.id.startsWith('gid://shopify/Customer/')) {
+  // All customers from GraphQL should already have the correct ID format
+  if (customer.id && String(customer.id).startsWith('gid://shopify/Customer/')) {
     return customer.id;
   }
   
-  // If we have a numeric ID, convert to GraphQL format
+  // Fallback for any legacy numeric IDs
   if (customer.id) {
     return `gid://shopify/Customer/${customer.id}`;
   }
