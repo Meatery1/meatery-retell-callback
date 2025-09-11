@@ -932,9 +932,16 @@ export async function createWinBackDraftOrder({
       }
     `;
 
+    // Use real customer email if we found one, otherwise use the provided email
+    const draftOrderEmail = (customer?.email && customer.email.includes('@')) 
+      ? customer.email 
+      : customerEmail;
+    
+    console.log(`📧 Draft order email field: ${draftOrderEmail} (${draftOrderEmail !== customerEmail ? 'real customer email' : 'placeholder email'})`);
+
     const variables = {
       input: {
-        email: customerEmail,
+        email: draftOrderEmail,
         lineItems: lineItems,
         appliedDiscount: {
           value: discountValue,

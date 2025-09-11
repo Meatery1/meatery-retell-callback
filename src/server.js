@@ -1348,6 +1348,12 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
         if (customer) {
           customerGid = getCustomerGid(customer);
           console.log(`👤 Customer for voicemail draft order: ${customer.displayName || customer.email || customer.phone} (${customerGid})`);
+          
+          // Use real customer email if available
+          if (customer.email && customer.email.includes('@')) {
+            finalCustomerEmail = customer.email;
+            console.log(`📧 Updated to real customer email: ${finalCustomerEmail}`);
+          }
         }
       } catch (error) {
         console.error('⚠️ Customer lookup/creation failed for voicemail, proceeding without customer:', error.message);
