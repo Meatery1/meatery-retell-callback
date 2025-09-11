@@ -653,8 +653,32 @@ export async function createWinBackDraftOrder({
     const shopifyGraphqlEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-07/graphql.json`;
     const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN;
     
+    // Import customer management utilities
+    const { findOrCreateCustomer, getCustomerGid } = await import('./customer-management.js');
+    
     if (!shopifyAccessToken || !process.env.SHOPIFY_STORE_DOMAIN) {
       throw new Error('Shopify credentials not configured');
+    }
+
+    // Find or create customer for draft order association
+    let customer = null;
+    let customerGid = null;
+    
+    try {
+      customer = await findOrCreateCustomer({
+        email: customerEmail,
+        phone: customerPhone,
+        name: customerName
+      });
+      
+      if (customer) {
+        customerGid = getCustomerGid(customer);
+        console.log(`👤 Customer for draft order: ${customer.display_name || customer.email || customer.phone} (${customerGid})`);
+      } else {
+        console.log('⚠️ No customer association - draft order will be created without customer');
+      }
+    } catch (error) {
+      console.error('⚠️ Customer lookup/creation failed, proceeding without customer:', error.message);
     }
 
     let variantsToUse = productVariants;
@@ -885,6 +909,12 @@ export async function createWinBackDraftOrder({
               }
             }
             invoiceUrl
+            customer {
+              id
+              displayName
+              email
+              phone
+            }
             lineItems(first: 10) {
               edges {
                 node {
@@ -915,7 +945,13 @@ export async function createWinBackDraftOrder({
         note: `Win-back order for ${customerName} - ${discountValue}% discount applied`,
         tags: ["win-back", "grace-ai", "retell-generated"],
         sourceName: "Grace AI Win-Back Campaign",
-        visibleToCustomer: true
+        visibleToCustomer: true,
+        // Associate customer with draft order if available
+        ...(customerGid && {
+          purchasingEntity: {
+            customerId: customerGid
+          }
+        })
       }
     };
 
@@ -939,6 +975,13 @@ export async function createWinBackDraftOrder({
     }
 
     const draftOrder = data.data.draftOrderCreate.draftOrder;
+    
+    // Log customer association success
+    if (draftOrder.customer) {
+      console.log(`✅ Draft order created with customer: ${draftOrder.customer.displayName} (${draftOrder.customer.email || draftOrder.customer.phone})`);
+    } else {
+      console.log(`ℹ️ Draft order created without customer association`);
+    }
     
     // Send invoice email via Shopify
     const invoiceMutation = `

@@ -657,16 +657,16 @@ app.post("/webhooks/retell", express.raw({ type: "application/json" }), (req, re
           try {
             console.log('🛒 Creating Shopify Draft Order for voicemail customer...');
             
-            // Use the exact same logic as the working manual voicemail endpoint
+            // Use the EXACT SAME VARIANTS as the working manual voicemail endpoint
             draftOrderResult = await createWinBackDraftOrder({
               customerEmail,
               customerPhone: customerPhone ? normalizeToE164(customerPhone) : null,
               customerName,
               productVariants: [
-                "gid://shopify/ProductVariant/46769584308440", // Japanese A5 Wagyu Ribeye
-                "gid://shopify/ProductVariant/46769584341208", // Japanese A5 Wagyu Filet Mignon  
-                "gid://shopify/ProductVariant/46769584046296", // Australian Wagyu Ribeye
-                "gid://shopify/ProductVariant/46769584079064"  // Australian Wagyu Filet Mignon
+                "gid://shopify/ProductVariant/37661352100037", // Japanese A5 Wagyu Ribeye
+                "gid://shopify/ProductVariant/40158682316997", // Japanese A5 Wagyu Filet Mignon
+                "gid://shopify/ProductVariant/45106426609880", // Australian Wagyu Ribeye 16oz
+                "gid://shopify/ProductVariant/39900512813253"  // Australian Wagyu Filet Mignon
               ],
               discountValue: 20,
               targetAmount: 422
@@ -1321,6 +1321,28 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
     console.log('📧 Creating voicemail draft order with predefined products...');
     let draftOrderResult;
     try {
+      // Import customer management utilities
+      const { findOrCreateCustomer, getCustomerGid } = await import('./customer-management.js');
+      
+      // Find or create customer for draft order association
+      let customer = null;
+      let customerGid = null;
+      
+      try {
+        customer = await findOrCreateCustomer({
+          email: finalCustomerEmail,
+          phone: finalCustomerPhone,
+          name: finalCustomerName
+        });
+        
+        if (customer) {
+          customerGid = getCustomerGid(customer);
+          console.log(`👤 Customer for voicemail draft order: ${customer.display_name || customer.email || customer.phone} (${customerGid})`);
+        }
+      } catch (error) {
+        console.error('⚠️ Customer lookup/creation failed for voicemail, proceeding without customer:', error.message);
+      }
+      
       // Create draft order with EXACT variants - bypass all the smart logic
       const shopifyGraphqlEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-07/graphql.json`;
       const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_TOKEN;
@@ -1338,6 +1360,12 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
                 }
               }
               invoiceUrl
+              customer {
+                id
+                displayName
+                email
+                phone
+              }
             }
             userErrors {
               field
@@ -1365,7 +1393,13 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
           note: `Voicemail follow-up order for ${finalCustomerName} - 20% discount applied`,
           tags: ["voicemail-followup", "grace-ai", "retell-generated"],
           sourceName: "Grace AI Voicemail Follow-up",
-          visibleToCustomer: true
+          visibleToCustomer: true,
+          // Associate customer with draft order if available
+          ...(customerGid && {
+            purchasingEntity: {
+              customerId: customerGid
+            }
+          })
         }
       };
 
@@ -1396,6 +1430,13 @@ app.post("/tools/send-voicemail-followup", async (req, res) => {
       if (!draftOrder) {
         console.error('❌ No draft order returned from Shopify');
         throw new Error('No draft order returned from Shopify API');
+      }
+      
+      // Log customer association success
+      if (draftOrder.customer) {
+        console.log(`✅ Voicemail draft order created with customer: ${draftOrder.customer.displayName} (${draftOrder.customer.email || draftOrder.customer.phone})`);
+      } else {
+        console.log(`ℹ️ Voicemail draft order created without customer association`);
       }
       
       draftOrderResult = {
