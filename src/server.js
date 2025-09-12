@@ -111,7 +111,13 @@ function appendJsonl(file, obj) {
 }
 
 // --- Helpers ---
-function inCallWindow(now = new Date()) {
+function inCallWindow(now = new Date(), bypassOverride = false) {
+  // Allow bypassing for testing purposes
+  if (process.env.BYPASS_CALL_WINDOW === 'true' || bypassOverride) {
+    console.log('🚫 Bypassing call window restriction for testing');
+    return true;
+  }
+  
   const tz = process.env.CALL_WINDOW_LOCAL_TZ || "America/Los_Angeles";
   const start = process.env.CALL_WINDOW_START || "09:00";
   const end = process.env.CALL_WINDOW_END || "19:30";
@@ -267,6 +273,28 @@ async function placeWinBackCall({ phone, customerName, agentId, fromNumber, meta
     // Pre-fetch customer order history before creating the call
     const orderHistory = await getCustomerOrderHistory(phone, null, 3);
     
+    // Extract the actual customer name from order history if available
+    let finalCustomerName = customerName;
+    if (orderHistory.success && orderHistory.customer && orderHistory.customer.name) {
+      // Extract first name only from the full name
+      const fullName = orderHistory.customer.name.trim();
+      const firstName = fullName.split(' ')[0];
+      
+      // Only use the first name if it's not empty and not just the email
+      if (firstName && firstName.length > 0 && !firstName.includes('@')) {
+        finalCustomerName = firstName;
+        console.log(`✅ Using customer first name from order history: ${finalCustomerName}`);
+      } else {
+        console.log(`⚠️ Customer name from order history appears to be email or invalid: ${fullName}`);
+      }
+    }
+    
+    // If we still don't have a proper name, use a generic fallback
+    if (!finalCustomerName || finalCustomerName.includes('@') || finalCustomerName.length < 2) {
+      finalCustomerName = 'there';
+      console.log(`⚠️ Using generic fallback name: ${finalCustomerName}`);
+    }
+    
     let historyData = {};
     if (orderHistory.success && orderHistory.orderHistory.length > 0) {
       const history = orderHistory.orderHistory[0]; // Most recent order
@@ -308,7 +336,7 @@ async function placeWinBackCall({ phone, customerName, agentId, fromNumber, meta
 
     const vars = {
       call_direction: 'OUTBOUND',
-      customer_name: customerName,
+      customer_name: finalCustomerName,
       customer_phone: phone,
       // Pre-fetched order data - no API calls needed during conversation
       ...historyData
@@ -498,7 +526,8 @@ app.post("/agents/:id/sync-defaults", async (req, res) => {
 // Manually trigger calls for last N hours (default 48)
 app.post("/tasks/call-recent", async (req, res) => {
   try {
-    if (!inCallWindow()) return res.status(403).json({ error: "Outside calling window" });
+    const bypassWindow = req.query.bypass_window === 'true' || req.body.bypass_window === true;
+    if (!inCallWindow(new Date(), bypassWindow)) return res.status(403).json({ error: "Outside calling window" });
     const hours = Number(req.body?.hours || 48);
     const candidates = await fetchRecentDeliveredOrders({ hours });
     const dnc = new Set(readJson(dncPath, { phones: [] }).phones);
@@ -954,8 +983,9 @@ app.get("/shopify/order-by-number", async (req, res) => {
 // Batch call with optional overrides
 app.post("/call/batch", async (req, res) => {
   try {
-    const { hours = 48, fromNumber, max_followup_questions, resolution_preference } = req.body || {};
-    if (!inCallWindow()) return res.status(403).json({ error: "Outside calling window" });
+    const { hours = 48, fromNumber, max_followup_questions, resolution_preference, bypass_window } = req.body || {};
+    const bypassWindow = req.query.bypass_window === 'true' || bypass_window === true;
+    if (!inCallWindow(new Date(), bypassWindow)) return res.status(403).json({ error: "Outside calling window" });
     const candidates = await fetchRecentDeliveredOrders({ hours });
     const dnc = new Set(readJson(dncPath, { phones: [] }).phones);
     const results = [];
@@ -993,13 +1023,14 @@ app.post("/call/batch", async (req, res) => {
 // Win-back call endpoint
 app.post("/call/win-back", async (req, res) => {
   try {
-    const { phone, customerName, fromNumber } = req.body;
+    const { phone, customerName, fromNumber, bypass_window } = req.body;
     
     if (!phone) {
       return res.status(400).json({ error: "Phone number is required" });
     }
     
-    if (!inCallWindow()) {
+    const bypassWindow = req.query.bypass_window === 'true' || bypass_window === true;
+    if (!inCallWindow(new Date(), bypassWindow)) {
       return res.status(403).json({ error: "Outside calling window" });
     }
     
@@ -2731,7 +2762,8 @@ app.get("/calls/recent-log", (req, res) => {
 // Batch process abandoned checkouts
 app.post("/call/abandoned-checkout", async (req, res) => {
   try {
-    if (!inCallWindow()) {
+    const bypassWindow = req.query.bypass_window === 'true' || req.body.bypass_window === true;
+    if (!inCallWindow(new Date(), bypassWindow)) {
       return res.status(403).json({ error: "Outside calling window" });
     }
     
@@ -2757,7 +2789,8 @@ app.post("/call/abandoned-checkout", async (req, res) => {
 // Individual abandoned checkout call
 app.post("/call/abandoned-checkout/single", async (req, res) => {
   try {
-    if (!inCallWindow()) {
+    const bypassWindow = req.query.bypass_window === 'true' || req.body.bypass_window === true;
+    if (!inCallWindow(new Date(), bypassWindow)) {
       return res.status(403).json({ error: "Outside calling window" });
     }
     

@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-09-12T09:00:43.920Z",
+  "improvements": {
+    "new_sections": {
+      "handling_discount_dissatisfaction": "If a customer expresses dissatisfaction with the discount, respond with: 'I understand your concern. Let me see what I can do to make this more appealing for you. How about an additional surprise discount on your next purchase?'",
+      "unknown_issues": "In cases where the user's issue is unclear or unknown, say: 'I want to ensure we're addressing your needs. Could you please provide more details on what might be concerning you?'",
+      "edge_case_follow_up": "For customers who haven't ordered in a while, use: 'We miss having you as part of The Meatery family. Is there anything specific you're looking for or any questions I can help with today?'"
+    },
+    "modifications": {
+      "live_conversation_opening": "Enhance the opening by adding: 'I noticed you had {{item_count}} items in your cart including our premium {{most_expensive_item}}. Did you have any issues with the checkout process or was there another reason you decided to wait?'",
+      "urgency_and_scarcity": "Add: 'This special offer is only unlocked for our frequent shoppers like you. It might not be available next time.'",
+      "discount_delivery": "Include a reassurance: 'This code can be combined with other offers you're eligible for.'"
+    },
+    "priority_fixes": [
+      "Addressing user dissatisfaction with discounts",
+      "Clarifying issues when the user is vague",
+      "Engaging lapsed customers with personalized offers",
+      "Improving voicemail detection and handling"
+    ],
+    "expected_improvement": "10-15% increase in success rate by resolving common dissatisfaction and engaging customers more effectively."
+  },
+  "updated_agents": [],
+  "version": 1757667643920
+}
