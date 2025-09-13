@@ -769,14 +769,46 @@ async function applyImprovements(improvements, discoveredAgents, requireApproval
         general_prompt: improvedPrompt
       });
       
-      updatedAgents.push({
-        agent_id: agent.id,
-        agent_name: agent.name,
-        llm_id: agent.llm_id,
-        last_modified: updated.last_modification_timestamp
-      });
-      
-      console.log(`✅ ${agent.name} updated successfully`);
+      // CRITICAL: Publish the new agent version to make it live
+      console.log(`📤 Publishing new version for ${agent.name}...`);
+      try {
+        // Get the agent to find the latest version
+        const agentDetails = await retell.agent.retrieve(agent.id);
+        const latestVersion = agentDetails.version;
+        
+        // Update the agent to use the new LLM version and publish it
+        const publishedAgent = await retell.agent.update(agent.id, {
+          response_engine: {
+            type: 'retell-llm',
+            llm_id: agent.llm_id,
+            version: updated.version
+          }
+        });
+        
+        console.log(`🚀 ${agent.name} published successfully (version ${publishedAgent.version})`);
+        
+        updatedAgents.push({
+          agent_id: agent.id,
+          agent_name: agent.name,
+          llm_id: agent.llm_id,
+          last_modified: updated.last_modification_timestamp,
+          published_version: publishedAgent.version,
+          is_published: true
+        });
+        
+      } catch (publishError) {
+        console.error(`❌ Failed to publish ${agent.name}:`, publishError.message);
+        // Still track the LLM update even if publishing failed
+        updatedAgents.push({
+          agent_id: agent.id,
+          agent_name: agent.name,
+          llm_id: agent.llm_id,
+          last_modified: updated.last_modification_timestamp,
+          published_version: null,
+          is_published: false,
+          publish_error: publishError.message
+        });
+      }
       
     } catch (error) {
       console.error(`❌ Failed to update ${agent.name}:`, error.message);
