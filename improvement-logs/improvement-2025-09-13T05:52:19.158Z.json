@@ -1,0 +1,102 @@
+{
+  "timestamp": "2025-09-13T05:52:19.158Z",
+  "improvements": {
+    "new_sections": {
+      "retry_voicemail": "If a call is forwarded to voicemail and the mailbox is full or unavailable, log it as 'voicemail unavailable' and attempt another call after 24 hours. If the issue persists, flag the number for manual follow-up.",
+      "retry_discount_request": "If a customer requests a discount larger than 10% and declines the current offer, log the call for a follow-up by a human agent to explore further options. Mention that their interest is noted for future promotions.",
+      "call_end_confirmation": "After delivering the discount code or resolving the customer's issue, confirm the action: 'I've sent the code to your preferred contact. Did you receive it?' Ensure the customer acknowledges receipt before ending the call."
+    },
+    "modifications": {
+      "LIVE_CONVERSATION_OPENING": "Add a follow-up question to the initial query about checkout troubles: 'Or was there something specific you couldn't find on our site?' This can guide the conversation based on their feedback.",
+      "DISCOUNT_DELIVERY - PRIORITIZE TEXT": "Include a confirmation of the correct phone number or email before sending the discount code. Example: 'Can I confirm that the code should be sent to this number/email?'",
+      "EDGE_CASE_HANDLING": "Expand the current edge case handling to include a suggestion for customers to visit the website for more details if the call disconnects prematurely: 'If we got cut off, feel free to visit our website for more info or call back.'"
+    },
+    "priority_fixes": [
+      "Ensure voicemail detection is accurate and consistent, even in varied voicemail messages.",
+      "Improve handling of calls where the customer's name is not available or incorrectly populated to maintain professionalism.",
+      "Introduce a clearer path for handling calls that disconnect unexpectedly, ensuring the customer feels supported."
+    ],
+    "expected_improvement": "10-15% increase in success rate due to improved handling of voicemail issues and a more dynamic response to customer inquiries and discount requests."
+  },
+  "updated_agents": [
+    {
+      "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+      "agent_name": "The Meatery Abandoned Checkout (Outbound)",
+      "llm_id": "llm_330631504f69f5507c481d3447bf",
+      "last_modified": 1757742737547
+    },
+    {
+      "agent_id": "agent_9dfa2b728cd32e308633bfd9df",
+      "agent_name": "Grace - Focused Win-Back Specialist",
+      "llm_id": "llm_2cd775883cb7fd5a638842760184",
+      "last_modified": 1757742737696
+    },
+    {
+      "agent_id": "agent_9dfa2b728cd32e308633bfd9df",
+      "agent_name": "The Meatery - 90+ Day Win-Back Outbound",
+      "llm_id": "llm_2cd775883cb7fd5a638842760184",
+      "last_modified": 1757742737936
+    },
+    {
+      "agent_id": "agent_da312bdba8f0abfacc0e086fe1",
+      "agent_name": "The Meatery - Inbound Returns Agent",
+      "llm_id": "llm_0cb3be4b23ea4a7d652dd4f7a8ed",
+      "last_modified": 1757742738076
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Nick - Inbound Calls",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742738211
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Grace - Delivered Orders",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742738334
+    },
+    {
+      "agent_id": "agent_1e885e2caf74fde2496982d38f",
+      "agent_name": "The Meatery Abandoned Checkout (Inbound)",
+      "llm_id": "llm_c0a968178521c344b0180fce6865",
+      "last_modified": 1757742738519
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Nick - Outbound Calls",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742738653
+    },
+    {
+      "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+      "agent_name": "The Meatery Abandoned Checkout Recovery Specialist",
+      "llm_id": "llm_330631504f69f5507c481d3447bf",
+      "last_modified": 1757742738852
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Mike - Inbound Calls",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742739030
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Mike - Outbound Calls",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742739163
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Mike - Multi-Prompt",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742739300
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Mike (Confident Male)",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742739492
+    }
+  ],
+  "version": 1757742739158
+}

@@ -445,7 +445,9 @@ export async function sendDailyImprovementSummary(summaryData) {
       priority_fixes,
       expected_improvement,
       next_analysis_time,
-      status
+      status,
+      performance_comparison,
+      agents_analyzed
     } = summaryData;
 
     const subject = `Daily Agent Improvement Summary - ${analysis_date}`;
@@ -484,6 +486,43 @@ export async function sendDailyImprovementSummary(summaryData) {
             <div class="metric-value">${success_rate}%</div>
             <div class="metric-label">Current Success Rate</div>
         </div>
+
+        <div class="metric">
+            <div class="metric-value">${agents_analyzed || 0}</div>
+            <div class="metric-label">Agents Analyzed</div>
+        </div>
+        
+        ${performance_comparison ? `
+        <div class="section-title">📈 Performance Improvement Tracking</div>
+        <div class="improvement">
+            <strong>🎯 Incremental Improvement Analysis:</strong><br>
+            <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 8px; text-align: left; border: 1px solid #dee2e6;">Metric</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">Before Last Improvement</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">After Last Improvement</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">Change</th>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #dee2e6;">Success Rate</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">${performance_comparison.before_improvement?.success_rate || 'N/A'}%</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">${performance_comparison.after_improvement?.success_rate || 'N/A'}%</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6; ${performance_comparison.improvement_lift?.success_rate_change > 0 ? 'color: green;' : performance_comparison.improvement_lift?.success_rate_change < 0 ? 'color: red;' : ''}">${performance_comparison.improvement_lift?.success_rate_change > 0 ? '+' : ''}${performance_comparison.improvement_lift?.success_rate_change || 'N/A'}%</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #dee2e6;">Total Calls</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">${performance_comparison.before_improvement?.total_calls || 'N/A'}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">${performance_comparison.after_improvement?.total_calls || 'N/A'}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">${performance_comparison.improvement_lift?.total_calls_change > 0 ? '+' : ''}${performance_comparison.improvement_lift?.total_calls_change || 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #dee2e6;">Overall Lift</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;" colspan="2">Last improvement from ${performance_comparison.last_improvement_date}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6; font-weight: bold; ${performance_comparison.improvement_lift?.percentage_lift > 0 ? 'color: green;' : performance_comparison.improvement_lift?.percentage_lift < 0 ? 'color: red;' : ''}">${performance_comparison.improvement_lift?.percentage_lift}%</td>
+                </tr>
+            </table>
+        </div>
+        ` : ''}
         
         <div class="section-title">📊 Analysis Status</div>
         <div class="metric">

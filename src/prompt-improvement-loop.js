@@ -13,37 +13,134 @@ import Retell from 'retell-sdk';
 import OpenAI from 'openai';
 import fs from 'fs/promises';
 import path from 'path';
-import { sendDailyImprovementSummary } from './email-service.js';
+import dotenv from 'dotenv';
+import { sendDailyImprovementSummary, initializeEmailService } from './email-service.js';
+import { discoverAgentsFromAPI } from './retell-config.js';
+
+// Load environment variables
+dotenv.config();
 
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Configuration
+// Configuration - now fully dynamic
 const CONFIG = {
-  // All three agents to analyze
-  AGENTS: [
-    {
-      id: 'agent_e2636fcbe1c89a7f6bd0731e11',
-      name: 'The Meatery Abandoned Checkout Recovery Specialist',
-      llm_id: 'llm_330631504f69f5507c481d3447bf'
-    },
-    {
-      id: 'agent_2020d704dcc0b7f8552cacd973',
-      name: 'Meatery Nick - Inbound Calls',
-      llm_id: 'llm_6f85ccc95ee753c590eff1bcd5e2'
-    },
-    {
-      id: 'agent_2f7a3254099b872da193df3133',
-      name: 'Meatery Nick - Outbound Calls',
-      llm_id: 'llm_7eed186989d2fba11fa1f9395bc7'
-    }
-  ],
   ANALYSIS_WINDOW_HOURS: 24, // Back to 24 hours for daily analysis
   MIN_CALLS_FOR_ANALYSIS: 1, // Reduced since we're only looking at 1 day
   IMPROVEMENT_MODEL: 'gpt-4o',
   LOGS_DIR: './improvement-logs',
-  LAST_ANALYSIS_FILE: './improvement-logs/last-analysis-timestamp.json'
+  LAST_ANALYSIS_FILE: './improvement-logs/last-analysis-timestamp.json',
+  // Agent filtering options
+  AGENT_FILTERS: {
+    // Include agents that match these patterns (case insensitive)
+    include_patterns: [
+      'meatery', 'nick', 'grace', 'abandoned', 'checkout', 'recovery', 'inbound', 'outbound'
+    ],
+    // Exclude agents that match these patterns (case insensitive)  
+    exclude_patterns: [
+      'test', 'demo', 'sandbox', 'dev', 'staging'
+    ],
+    // Only include agents that have LLMs configured
+    require_llm: true,
+    // Only include agents that were active in the last N days
+    active_within_days: 30
+  }
 };
+
+/**
+ * Dynamically discover and filter agents from Retell API
+ */
+async function discoverActiveAgents() {
+  console.log('🔍 Discovering agents from Retell API...');
+  
+  try {
+    // Get all agents from API
+    const discoveredAgents = await discoverAgentsFromAPI();
+    
+    if (Object.keys(discoveredAgents).length === 0) {
+      console.warn('⚠️ No agents discovered from API');
+      return [];
+    }
+    
+    console.log(`📋 Found ${Object.keys(discoveredAgents).length} total agents`);
+    
+    // Convert to array and filter
+    let agents = Object.entries(discoveredAgents).map(([key, config]) => ({
+      id: config.agentId,
+      name: config.name,
+      llm_id: config.llmId,
+      voice_id: config.voice,
+      language: config.language,
+      discovery_key: key
+    }));
+    
+    console.log('🔧 Applying filters...');
+    
+    // Filter out agents without LLMs if required
+    if (CONFIG.AGENT_FILTERS.require_llm) {
+      const beforeCount = agents.length;
+      agents = agents.filter(agent => agent.llm_id && agent.llm_id.startsWith('llm_'));
+      console.log(`   ✅ Agents with LLMs: ${agents.length}/${beforeCount}`);
+    }
+    
+    // Apply include patterns
+    if (CONFIG.AGENT_FILTERS.include_patterns.length > 0) {
+      const beforeCount = agents.length;
+      agents = agents.filter(agent => {
+        const nameText = agent.name.toLowerCase();
+        return CONFIG.AGENT_FILTERS.include_patterns.some(pattern => 
+          nameText.includes(pattern.toLowerCase())
+        );
+      });
+      console.log(`   ✅ Matching include patterns: ${agents.length}/${beforeCount}`);
+    }
+    
+    // Apply exclude patterns
+    if (CONFIG.AGENT_FILTERS.exclude_patterns.length > 0) {
+      const beforeCount = agents.length;
+      agents = agents.filter(agent => {
+        const nameText = agent.name.toLowerCase();
+        return !CONFIG.AGENT_FILTERS.exclude_patterns.some(pattern => 
+          nameText.includes(pattern.toLowerCase())
+        );
+      });
+      console.log(`   ✅ After excluding patterns: ${agents.length}/${beforeCount}`);
+    }
+    
+    // Validate agent accessibility
+    console.log('🧪 Validating agent accessibility...');
+    const validAgents = [];
+    
+    for (const agent of agents) {
+      try {
+        // Test if we can retrieve the agent
+        await retell.agent.retrieve(agent.id);
+        
+        // Test if we can retrieve the LLM
+        if (agent.llm_id) {
+          await retell.llm.retrieve(agent.llm_id);
+        }
+        
+        validAgents.push(agent);
+        console.log(`   ✅ ${agent.name}: accessible`);
+      } catch (error) {
+        console.log(`   ❌ ${agent.name}: ${error.message}`);
+      }
+    }
+    
+    console.log(`📊 Final result: ${validAgents.length} agents ready for analysis`);
+    
+    if (validAgents.length === 0) {
+      console.warn('⚠️ No valid agents found after filtering and validation');
+    }
+    
+    return validAgents;
+    
+  } catch (error) {
+    console.error('❌ Agent discovery failed:', error.message);
+    throw new Error(`Agent discovery failed: ${error.message}`);
+  }
+}
 
 /**
  * Request human approval for significant changes
@@ -103,16 +200,13 @@ function detectAnomalies(calls) {
  */
 async function getLastAnalysisTimestamp() {
   try {
-    if (fs.existsSync(CONFIG.LAST_ANALYSIS_FILE)) {
-      const data = JSON.parse(await fs.readFile(CONFIG.LAST_ANALYSIS_FILE, 'utf8'));
-      return new Date(data.last_analysis);
-    }
+    const data = JSON.parse(await fs.readFile(CONFIG.LAST_ANALYSIS_FILE, 'utf8'));
+    return new Date(data.last_analysis);
   } catch (error) {
-    console.warn('⚠️  Could not read last analysis timestamp:', error.message);
+    console.warn('⚠️ Could not read last analysis timestamp:', error.message);
+    // If no previous analysis, start from 24 hours ago
+    return new Date(Date.now() - (24 * 60 * 60 * 1000));
   }
-  
-  // If no previous analysis, start from 24 hours ago
-  return new Date(Date.now() - (24 * 60 * 60 * 1000));
 }
 
 /**
@@ -134,9 +228,128 @@ async function updateLastAnalysisTimestamp() {
 }
 
 /**
- * Fetch recent calls and analyze patterns for all agents
+ * Get performance metrics for a specific time period
+ */
+async function getPerformanceMetrics(agents, startTime, endTime, label) {
+  console.log(`📊 Analyzing ${label} performance (${new Date(startTime).toLocaleDateString()} - ${new Date(endTime).toLocaleDateString()})...`);
+  
+  let totalCalls = 0;
+  let successfulCalls = 0;
+  let voicemailCalls = 0;
+  const agentMetrics = {};
+  
+  for (const agent of agents) {
+    try {
+      const calls = await retell.call.list({
+        agent_id: agent.id,
+        start_timestamp: startTime,
+        end_timestamp: endTime,
+        limit: 100
+      });
+      
+      // Filter for phone calls only
+      const phoneCalls = calls.filter(call => call.from_number && call.to_number);
+      
+      const agentSuccessful = phoneCalls.filter(call => call.call_analysis?.call_successful !== false).length;
+      const agentVoicemail = phoneCalls.filter(call => call.call_analysis?.in_voicemail).length;
+      
+      agentMetrics[agent.id] = {
+        name: agent.name,
+        total: phoneCalls.length,
+        successful: agentSuccessful,
+        voicemail: agentVoicemail,
+        success_rate: phoneCalls.length > 0 ? (agentSuccessful / phoneCalls.length * 100).toFixed(1) : '0.0'
+      };
+      
+      totalCalls += phoneCalls.length;
+      successfulCalls += agentSuccessful;
+      voicemailCalls += agentVoicemail;
+      
+    } catch (error) {
+      console.warn(`⚠️ Error fetching ${label} calls for ${agent.name}:`, error.message);
+      agentMetrics[agent.id] = {
+        name: agent.name,
+        total: 0,
+        successful: 0,
+        voicemail: 0,
+        success_rate: '0.0',
+        error: error.message
+      };
+    }
+  }
+  
+  const overallSuccessRate = totalCalls > 0 ? (successfulCalls / totalCalls * 100).toFixed(1) : '0.0';
+  
+  return {
+    label,
+    period: { start: startTime, end: endTime },
+    total_calls: totalCalls,
+    successful_calls: successfulCalls,
+    voicemail_calls: voicemailCalls,
+    success_rate: parseFloat(overallSuccessRate),
+    agent_metrics: agentMetrics
+  };
+}
+
+/**
+ * Calculate improvement lift between two periods
+ */
+function calculateImprovementLift(beforeMetrics, afterMetrics) {
+  if (!beforeMetrics || !afterMetrics) {
+    return null;
+  }
+  
+  const lift = {
+    success_rate_change: afterMetrics.success_rate - beforeMetrics.success_rate,
+    total_calls_change: afterMetrics.total_calls - beforeMetrics.total_calls,
+    successful_calls_change: afterMetrics.successful_calls - beforeMetrics.successful_calls,
+    voicemail_calls_change: afterMetrics.voicemail_calls - beforeMetrics.voicemail_calls,
+    percentage_lift: beforeMetrics.success_rate > 0 ? 
+      ((afterMetrics.success_rate - beforeMetrics.success_rate) / beforeMetrics.success_rate * 100).toFixed(1) : 'N/A'
+  };
+  
+  return lift;
+}
+
+/**
+ * Get the last improvement timestamp to measure effectiveness
+ */
+async function getLastImprovementTimestamp() {
+  try {
+    // Find the most recent improvement log
+    const files = await fs.readdir(CONFIG.LOGS_DIR);
+    const improvementFiles = files
+      .filter(f => f.startsWith('improvement-') && f.endsWith('.json'))
+      .sort()
+      .reverse();
+    
+    if (improvementFiles.length > 0) {
+      const latestFile = path.join(CONFIG.LOGS_DIR, improvementFiles[0]);
+      const data = JSON.parse(await fs.readFile(latestFile, 'utf8'));
+      return new Date(data.timestamp);
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not find last improvement timestamp:', error.message);
+  }
+  
+  // If no previous improvements, return 7 days ago
+  return new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
+}
+
+/**
+ * Fetch recent calls and analyze patterns for all discovered agents
  */
 async function fetchAndAnalyzeCalls() {
+  // Discover agents dynamically
+  const agents = await discoverActiveAgents();
+  
+  if (agents.length === 0) {
+    return { 
+      status: 'no_agents', 
+      message: 'No valid agents found for analysis' 
+    };
+  }
+  
   // Get the timestamp of the last analysis to avoid re-analyzing calls
   const lastAnalysis = await getLastAnalysisTimestamp();
   const now = new Date();
@@ -162,11 +375,11 @@ async function fetchAndAnalyzeCalls() {
   console.log(`🔍 Analysis window: ${Math.min(hoursSinceLast, maxLookbackHours).toFixed(1)} hours since last analysis`);
   console.log(`🔍 Fetching calls since: ${new Date(since).toLocaleString()}`);
   
-  // Collect calls from all agents
+  // Collect calls from all discovered agents
   let allCalls = [];
   let totalCallsFound = 0;
   
-  for (const agent of CONFIG.AGENTS) {
+  for (const agent of agents) {
     console.log(`📞 Fetching calls for ${agent.name}...`);
     
     try {
@@ -197,7 +410,7 @@ async function fetchAndAnalyzeCalls() {
       totalCallsFound += agentCalls.length;
       
     } catch (error) {
-      console.warn(`⚠️  Error fetching calls for ${agent.name}:`, error.message);
+      console.warn(`⚠️ Error fetching calls for ${agent.name}:`, error.message);
     }
   }
   
@@ -231,6 +444,7 @@ async function fetchAndAnalyzeCalls() {
   const analysis = {
     total: allCalls.length,
     total_calls_found: totalCallsFound,
+    discovered_agents: agents,
     by_agent: {},
     successful: [],
     failed: [],
@@ -240,8 +454,8 @@ async function fetchAndAnalyzeCalls() {
     unhandled_requests: []
   };
 
-  // Initialize agent-specific analysis
-  for (const agent of CONFIG.AGENTS) {
+  // Initialize agent-specific analysis for all discovered agents
+  for (const agent of agents) {
     analysis.by_agent[agent.id] = {
       name: agent.name,
       total: 0,
@@ -504,9 +718,9 @@ Format your response as a JSON object with:
 }
 
 /**
- * Apply improvements to all agents
+ * Apply improvements to all discovered agents
  */
-async function applyImprovements(improvements, requireApproval = false) {
+async function applyImprovements(improvements, discoveredAgents, requireApproval = false) {
   // Validate improvements for safety
   if (!validateImprovements(improvements)) {
     console.error('❌ Improvements failed safety validation');
@@ -518,14 +732,19 @@ async function applyImprovements(improvements, requireApproval = false) {
                        Object.keys(improvements.new_sections || {}).length > 2;
   
   if (isSignificant && requireApproval) {
-    console.log('⚠️  Significant changes detected - human approval required');
+    console.log('⚠️ Significant changes detected - human approval required');
     await requestHumanApproval(improvements);
+    return [];
   }
   
   const updatedAgents = [];
   
-  // Apply improvements to each agent
-  for (const agent of CONFIG.AGENTS) {
+  // Apply improvements to each discovered agent
+  for (const agent of discoveredAgents) {
+    if (!agent.llm_id) {
+      console.log(`⚠️ Skipping ${agent.name} - no LLM configured`);
+      continue;
+    }
     try {
       console.log(`🔄 Updating ${agent.name}...`);
       
@@ -597,11 +816,7 @@ async function logImprovement(improvements, updatedAgents) {
  */
 function preserveCoreBehaviors(improvedPrompt) {
   const coreBehaviors = [
-    'The Meatery', // Core business identity
-    'Nick', // Agent name
-    'order', // Order checking purpose
-    'cold', // Temperature check
-    'call_direction' // Critical call handling
+    'The Meatery' // Core business identity - this is the only universal requirement
   ];
   
   // Ensure all core behaviors remain
@@ -616,20 +831,77 @@ function preserveCoreBehaviors(improvedPrompt) {
 }
 
 /**
- * Main execution loop
+ * Main execution loop - now fully dynamic
  */
 async function runImprovementLoop() {
-  console.log('🔄 Starting Prompt Improvement Loop...\n');
+  console.log('🔄 Starting Dynamic Prompt Improvement Loop...\n');
+  
+  // Initialize email service for daily summaries
+  console.log('📧 Initializing email service...');
+  await initializeEmailService();
   
   try {
-    // Step 1: Analyze recent calls
-    console.log('📊 Analyzing recent calls...');
+    // Step 0: Get discovered agents for performance comparison
+    const agents = await discoverActiveAgents();
+    
+    if (agents.length === 0) {
+      console.log('⚠️ No valid agents found for analysis');
+      return { status: 'no_agents' };
+    }
+    
+    // Step 1: Measure performance BEFORE applying any improvements
+    console.log('📈 Measuring current performance vs previous improvements...');
+    
+    const now = Date.now();
+    const lastImprovement = await getLastImprovementTimestamp();
+    const dayInMs = 24 * 60 * 60 * 1000;
+    
+    // Get performance metrics for different periods
+    const beforeImprovement = await getPerformanceMetrics(
+      agents,
+      lastImprovement.getTime() - dayInMs, // Day before last improvement
+      lastImprovement.getTime(),           // Day of last improvement
+      "BEFORE Last Improvement"
+    );
+    
+    const afterImprovement = await getPerformanceMetrics(
+      agents,
+      lastImprovement.getTime(),           // Since last improvement
+      now,                                 // Until now
+      "AFTER Last Improvement"
+    );
+    
+    // Calculate the lift from last improvement
+    const improvementLift = calculateImprovementLift(beforeImprovement, afterImprovement);
+    
+    if (improvementLift) {
+      console.log('\n📈 IMPROVEMENT EFFECTIVENESS:');
+      console.log(`   Success Rate: ${beforeImprovement.success_rate}% → ${afterImprovement.success_rate}% (${improvementLift.success_rate_change > 0 ? '+' : ''}${improvementLift.success_rate_change}%)`);
+      console.log(`   Percentage Lift: ${improvementLift.percentage_lift}%`);
+      console.log(`   Total Calls: ${beforeImprovement.total_calls} → ${afterImprovement.total_calls} (${improvementLift.total_calls_change > 0 ? '+' : ''}${improvementLift.total_calls_change})`);
+      
+      // Only apply new improvements if the last one was effective OR if success rate is still low
+      if (parseFloat(improvementLift.percentage_lift) < -5) {
+        console.log('⚠️ Last improvement decreased performance by >5% - being more conservative with new changes');
+        CONFIG.MIN_CALLS_FOR_ANALYSIS = Math.max(CONFIG.MIN_CALLS_FOR_ANALYSIS * 2, 10);
+      } else if (parseFloat(improvementLift.percentage_lift) > 10) {
+        console.log('✅ Last improvement was very effective (+10%+) - continuing with similar changes');
+      }
+    }
+    
+    // Step 2: Analyze recent calls (now with dynamic agent discovery)
+    console.log('\n📊 Analyzing recent calls for new improvements...');
     const analysis = await fetchAndAnalyzeCalls();
     
     // Check if analysis was blocked due to anomalies
     if (!analysis) {
-      console.log('⚠️  Analysis blocked due to detected anomalies');
+      console.log('⚠️ Analysis blocked due to detected anomalies');
       return { status: 'blocked', reason: 'anomalies_detected' };
+    }
+    
+    if (analysis.status === 'no_agents') {
+      console.log('⚠️ No valid agents found for analysis');
+      return { status: 'no_agents' };
     }
     
     if (analysis.status === 'insufficient_new_data') {
@@ -648,7 +920,8 @@ async function runImprovementLoop() {
           priority_fixes: [],
           expected_improvement: 'None needed - system working well',
           next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
-          status: 'No new calls to analyze - system performing well'
+          status: 'No new calls to analyze - system performing well',
+          agents_analyzed: analysis.discovered_agents?.length || 0
         };
         
         await sendDailyImprovementSummary(summaryData);
@@ -669,10 +942,11 @@ async function runImprovementLoop() {
     console.log(`   - Success rate: ${((analysis.successful.length / analysis.total) * 100).toFixed(1)}%`);
     console.log(`   - Unhandled requests: ${analysis.unhandled_requests.length}`);
     console.log(`   - Edge cases: ${analysis.edge_cases.length}`);
+    console.log(`   - Agents discovered: ${analysis.discovered_agents.length}`);
     
     // Show agent-specific breakdown
     console.log('\n📊 Agent-specific breakdown:');
-    for (const agent of CONFIG.AGENTS) {
+    for (const agent of analysis.discovered_agents) {
       const agentData = analysis.by_agent[agent.id];
       if (agentData.total > 0) {
         const successRate = agentData.total > 0 ? ((agentData.successful / agentData.total) * 100).toFixed(1) : '0.0';
@@ -683,8 +957,14 @@ async function runImprovementLoop() {
     
     // Step 2: Generate improvements
     console.log('🤖 Generating prompt improvements...');
-    // Use the first agent's LLM for generating improvements (they should all be similar)
-    const currentLLM = await retell.llm.retrieve(CONFIG.AGENTS[0].llm_id);
+    // Use the first discovered agent's LLM for generating improvements
+    const firstAgent = analysis.discovered_agents.find(agent => agent.llm_id);
+    if (!firstAgent) {
+      console.error('❌ No agents with LLMs found for improvement generation');
+      return { status: 'no_llm_agents' };
+    }
+    
+    const currentLLM = await retell.llm.retrieve(firstAgent.llm_id);
     const improvements = await generatePromptImprovements(analysis, currentLLM.general_prompt);
     
     console.log('📝 Suggested improvements:');
@@ -697,7 +977,7 @@ async function runImprovementLoop() {
     
     // Step 3: Apply improvements
     console.log('🚀 Applying improvements...');
-    const updatedAgents = await applyImprovements(improvements);
+    const updatedAgents = await applyImprovements(improvements, analysis.discovered_agents);
     
     console.log('✅ All agent prompts updated successfully!');
     for (const agent of updatedAgents) {
@@ -725,6 +1005,13 @@ async function runImprovementLoop() {
         next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
         status: 'Improvements applied successfully',
         agent_breakdown: analysis.by_agent,
+        // Add performance comparison data
+        performance_comparison: {
+          before_improvement: beforeImprovement,
+          after_improvement: afterImprovement,
+          improvement_lift: improvementLift,
+          last_improvement_date: lastImprovement.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })
+        },
         updated_agents: updatedAgents.map(agent => ({
           name: agent.agent_name,
           llm_id: agent.llm_id,
@@ -807,20 +1094,19 @@ If voicemail detected:
   };
   
   console.log('📝 Applying Carlos-specific improvements...');
-  await applyImprovements(specificImprovements);
+  // Get current agents for this specific improvement
+  const agents = await discoverActiveAgents();
+  await applyImprovements(specificImprovements, agents);
   console.log('✅ Improvements applied!');
 }
 
 // Run immediately with full analysis loop
-if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log('🚀 Starting script execution...');
+if (import.meta.url.endsWith('prompt-improvement-loop.js')) {
+  console.log('🚀 Starting dynamic script execution...');
   console.log('Environment check:');
   console.log('- RETELL_API_KEY:', process.env.RETELL_API_KEY ? '✅ Set' : '❌ Missing');
   console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing');
-  console.log('\nAgents to analyze:');
-  for (const agent of CONFIG.AGENTS) {
-    console.log(`- ${agent.name}: ${agent.id}`);
-  }
+  console.log('\n🔍 Agent discovery will run automatically...');
   
   runImprovementLoop()
     .then(result => {

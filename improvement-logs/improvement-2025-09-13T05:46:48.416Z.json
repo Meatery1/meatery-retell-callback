@@ -1,0 +1,102 @@
+{
+  "timestamp": "2025-09-13T05:46:48.416Z",
+  "improvements": {
+    "new_sections": {
+      "UNHANDLED_REQUESTS": "If a user asks for a larger discount code than offered, respond with: 'I understand you're looking for a better deal. While I can offer a 10% discount right now, I'll also note your feedback for future promotions. Can we proceed with the current offer?'",
+      "EDGE_CASE_HANDLING": "When encountering a partially completed greeting due to a user disconnecting or unavailability, say: 'It seems we got cut off, but I'm here to help with any questions you might have about your cart at The Meatery. Feel free to call back or visit our website.'"
+    },
+    "modifications": {
+      "VOICEMAIL_DETECTION": "Enhance detection by including phrases like 'The person you are trying to reach', and 'Voice mailbox is full or not set up' to gracefully handle these scenarios. In such cases, log the call as 'voicemail unavailable' and attempt a follow-up later.",
+      "LIVE_CONVERSATION_OPENING": "Add a follow-up question if the initial query about checkout issues doesn't engage the user: 'I can also assist with recommendations or answer any questions about our products. What are you looking to achieve with your purchase?'",
+      "DISCOUNT_DELIVERY": "If the customer expresses dissatisfaction with the discount, add an option to offer free shipping if applicable: 'I can also offer free shipping on your next order if that helps. Would that work for you?'",
+      "URGENCY & SCARCITY": "Include a personalized touch by saying: 'Based on your selection, these have been quite popular this week, and they tend to sell out fast. I can hold them for you until the end of the day.'"
+    },
+    "priority_fixes": [
+      "Enhance voicemail detection to prevent attempts to leave messages when a mailbox is unavailable.",
+      "Add handling for requests for larger discounts to maintain customer engagement.",
+      "Include follow-up options for live conversations to better address customer needs and improve engagement."
+    ],
+    "expected_improvement": "Improving voicemail handling and unhandled requests should increase the success rate by approximately 10-15%, as it addresses the main points of customer dissatisfaction and enhances agent responsiveness."
+  },
+  "updated_agents": [
+    {
+      "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+      "agent_name": "The Meatery Abandoned Checkout (Outbound)",
+      "llm_id": "llm_330631504f69f5507c481d3447bf",
+      "last_modified": 1757742406732
+    },
+    {
+      "agent_id": "agent_9dfa2b728cd32e308633bfd9df",
+      "agent_name": "Grace - Focused Win-Back Specialist",
+      "llm_id": "llm_2cd775883cb7fd5a638842760184",
+      "last_modified": 1757742406865
+    },
+    {
+      "agent_id": "agent_9dfa2b728cd32e308633bfd9df",
+      "agent_name": "The Meatery - 90+ Day Win-Back Outbound",
+      "llm_id": "llm_2cd775883cb7fd5a638842760184",
+      "last_modified": 1757742406996
+    },
+    {
+      "agent_id": "agent_da312bdba8f0abfacc0e086fe1",
+      "agent_name": "The Meatery - Inbound Returns Agent",
+      "llm_id": "llm_0cb3be4b23ea4a7d652dd4f7a8ed",
+      "last_modified": 1757742407189
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Nick - Inbound Calls",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742407316
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Grace - Delivered Orders",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742407612
+    },
+    {
+      "agent_id": "agent_1e885e2caf74fde2496982d38f",
+      "agent_name": "The Meatery Abandoned Checkout (Inbound)",
+      "llm_id": "llm_c0a968178521c344b0180fce6865",
+      "last_modified": 1757742407743
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Nick - Outbound Calls",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742407886
+    },
+    {
+      "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+      "agent_name": "The Meatery Abandoned Checkout Recovery Specialist",
+      "llm_id": "llm_330631504f69f5507c481d3447bf",
+      "last_modified": 1757742408019
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Mike - Inbound Calls",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742408203
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Mike - Outbound Calls",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742408351
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Mike - Multi-Prompt",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742408538
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Mike (Confident Male)",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742408743
+    }
+  ],
+  "version": 1757742408416
+}

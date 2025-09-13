@@ -1,0 +1,102 @@
+{
+  "timestamp": "2025-09-13T05:45:00.795Z",
+  "improvements": {
+    "new_sections": {
+      "call_back_handling": "If a customer calls back and asks 'Who is this?', respond with: 'This is Grace from The Meatery. I left you a voicemail earlier about your cart with us. Are you calling back about that, or is there something else I can assist you with?'",
+      "unavailable_mailbox": "If you encounter a message stating the voicemail box is unavailable or not set up, do not attempt to leave a message. Instead, log the call as 'voicemail unavailable' and mark it for a follow-up attempt later."
+    },
+    "modifications": {
+      "voicemail_detection": "If you detect voicemail (beep, 'leave a message', automated greeting), and the voicemail is available, proceed to leave a message. If the voicemail is unavailable, log the call as 'voicemail unavailable' and do not leave a message.",
+      "live_conversation_opening": "When customer answers, start with: 'Hey {{customer_name}}, it's Grace from The Meatery. I noticed you had some awesome stuff in your cart but didn't finish checking out. Was it the price, or were you comparing options that stopped you from purchasing?'",
+      "conversation_flow": "Include: 'If you are still interested, I can guide you through the checkout process or answer any questions you might have about the products.'"
+    },
+    "priority_fixes": [
+      "Add handling for customers who call back and ask 'Who is this?'",
+      "Implement a strategy for when voicemail is unavailable",
+      "Enhance live conversation opening to immediately address potential issues like price or comparison",
+      "Ensure voicemail messages are not left if the voicemail box is unavailable or not set up"
+    ],
+    "expected_improvement": "5-10% increase in success rate by addressing common unhandled requests and voicemail issues"
+  },
+  "updated_agents": [
+    {
+      "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+      "agent_name": "The Meatery Abandoned Checkout (Outbound)",
+      "llm_id": "llm_330631504f69f5507c481d3447bf",
+      "last_modified": 1757742298241
+    },
+    {
+      "agent_id": "agent_9dfa2b728cd32e308633bfd9df",
+      "agent_name": "Grace - Focused Win-Back Specialist",
+      "llm_id": "llm_2cd775883cb7fd5a638842760184",
+      "last_modified": 1757742298437
+    },
+    {
+      "agent_id": "agent_9dfa2b728cd32e308633bfd9df",
+      "agent_name": "The Meatery - 90+ Day Win-Back Outbound",
+      "llm_id": "llm_2cd775883cb7fd5a638842760184",
+      "last_modified": 1757742298861
+    },
+    {
+      "agent_id": "agent_da312bdba8f0abfacc0e086fe1",
+      "agent_name": "The Meatery - Inbound Returns Agent",
+      "llm_id": "llm_0cb3be4b23ea4a7d652dd4f7a8ed",
+      "last_modified": 1757742299482
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Nick - Inbound Calls",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742299669
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Grace - Delivered Orders",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742299788
+    },
+    {
+      "agent_id": "agent_1e885e2caf74fde2496982d38f",
+      "agent_name": "The Meatery Abandoned Checkout (Inbound)",
+      "llm_id": "llm_c0a968178521c344b0180fce6865",
+      "last_modified": 1757742299923
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Nick - Outbound Calls",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742300141
+    },
+    {
+      "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+      "agent_name": "The Meatery Abandoned Checkout Recovery Specialist",
+      "llm_id": "llm_330631504f69f5507c481d3447bf",
+      "last_modified": 1757742300261
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Mike - Inbound Calls",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742300390
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Mike - Outbound Calls",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742300664
+    },
+    {
+      "agent_id": "agent_2020d704dcc0b7f8552cacd973",
+      "agent_name": "Meatery Mike - Multi-Prompt",
+      "llm_id": "llm_6f85ccc95ee753c590eff1bcd5e2",
+      "last_modified": 1757742300912
+    },
+    {
+      "agent_id": "agent_2f7a3254099b872da193df3133",
+      "agent_name": "Meatery Mike (Confident Male)",
+      "llm_id": "llm_7eed186989d2fba11fa1f9395bc7",
+      "last_modified": 1757742301048
+    }
+  ],
+  "version": 1757742300795
+}
