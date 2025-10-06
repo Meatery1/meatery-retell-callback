@@ -54,7 +54,9 @@ const CONFIG = {
   // NEW: Knowledge Base Configuration
   USE_KNOWLEDGE_BASE: process.env.USE_KNOWLEDGE_BASE === 'true' || true, // Default to KB mode now that Grace KB is built
   CORE_PROMPT_MAX_TOKENS: 3000, // Keep core prompt under this limit
-  ANALYZE_FULL_TRANSCRIPTS: true, // Analyze complete transcripts, not just summaries
+  ANALYZE_FULL_TRANSCRIPTS: false, // FIXED: Don't fetch full transcripts to avoid token limit - use summaries instead
+  MAX_TRANSCRIPT_CHARS: 500, // Maximum characters per transcript excerpt
+  MAX_CALLS_FOR_ANALYSIS: 50, // Maximum calls to deeply analyze (sample from larger set)
   
   // Agent filtering options
   AGENT_FILTERS: {
@@ -536,6 +538,27 @@ async function fetchAndAnalyzeCalls() {
   
   console.log(`📞 Found ${totalCallsFound} total calls, ${allCalls.length} phone calls in last 24 hours`);
   
+  // FIXED: Sample calls if we have too many to prevent token limit issues
+  if (allCalls.length > CONFIG.MAX_CALLS_FOR_ANALYSIS) {
+    console.log(`⚠️ Too many calls (${allCalls.length}) - sampling ${CONFIG.MAX_CALLS_FOR_ANALYSIS} for deep analysis`);
+    
+    // Prioritize failed calls and edge cases for analysis
+    const failedCalls = allCalls.filter(c => c.call_analysis?.call_successful === false);
+    const successfulCalls = allCalls.filter(c => c.call_analysis?.call_successful !== false);
+    
+    // Take all failed calls (up to 30) + sample of successful calls
+    const maxFailed = Math.min(failedCalls.length, 30);
+    const maxSuccessful = CONFIG.MAX_CALLS_FOR_ANALYSIS - maxFailed;
+    
+    const sampledCalls = [
+      ...failedCalls.slice(0, maxFailed),
+      ...successfulCalls.slice(0, maxSuccessful)
+    ];
+    
+    console.log(`   - Sampled ${sampledCalls.length} calls: ${maxFailed} failed, ${maxSuccessful} successful`);
+    allCalls = sampledCalls;
+  }
+  
   // Check if we have enough new phone calls to analyze
   if (allCalls.length < CONFIG.MIN_CALLS_FOR_ANALYSIS) {
     console.log(`⚠️  Not enough phone calls for analysis (${allCalls.length} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
@@ -674,13 +697,14 @@ async function fetchAndAnalyzeCalls() {
         call.call_analysis?.call_successful === true) {
       
       // Only include calls with substantial conversation (not just voicemail)
-      if (transcript.length > 200 && !call.call_analysis?.in_voicemail) {
+      // FIXED: Limit positive examples to avoid token overload
+      if (transcript.length > 200 && !call.call_analysis?.in_voicemail && analysis.positive_examples.length < 10) {
         analysis.positive_examples.push({
           call_id: call.call_id,
           agent_id: agentId,
           agent_name: call.agent_info.name,
           sentiment: call.call_analysis?.user_sentiment,
-          transcript: transcript,
+          transcript_excerpt: transcript.substring(0, CONFIG.MAX_TRANSCRIPT_CHARS), // FIXED: Only send excerpt
           duration: call.end_timestamp - call.start_timestamp,
           call_successful: call.call_analysis?.call_successful,
           key_moments: extractKeyMoments(transcript),
@@ -852,10 +876,25 @@ function filterAdversarialCalls(calls) {
 }
 
 /**
+ * Estimate token count (rough approximation: 1 token ≈ 4 characters)
+ */
+function estimateTokens(text) {
+  return Math.ceil(text.length / 4);
+}
+
+/**
  * Generate prompt improvements based on analysis
  * UPDATED: Now focuses on NEW issues and fringe cases only
+ * FIXED: Reduces token usage to prevent 429 errors
  */
 async function generatePromptImprovements(analysis, currentPrompt) {
+  // FIXED: Limit data sent to OpenAI to prevent token overload
+  const maxNewIssues = 20;
+  const maxUnhandledRequests = 20;
+  const maxEdgeCases = 10;
+  const maxPositiveExamples = 5;
+  const maxPromptChars = 4000; // Limit current prompt size
+  
   const improvementPrompt = `
 You are an AI prompt engineer specializing in voice AI agents. 
 Your task is to identify NEW, UNIQUE, and FRINGE issues that the agent hasn't encountered before.
@@ -875,12 +914,12 @@ SAFETY REQUIREMENTS:
 - ENSURE all improvements serve legitimate business purposes
 
 PREVIOUSLY ADDRESSED ISSUES (DO NOT REPEAT):
-Sections already added: ${analysis.previously_addressed.sections.join(', ')}
-Fixes already applied: ${analysis.previously_addressed.fixes.join(', ')}
+Sections already added: ${analysis.previously_addressed.sections.slice(0, 20).join(', ')}
+Fixes already applied: ${analysis.previously_addressed.fixes.slice(0, 20).join(', ')}
 Total previous improvements: ${analysis.previously_addressed.total_improvements}
 
-CURRENT AGENT PROMPT:
-${currentPrompt}
+CURRENT AGENT PROMPT (excerpt):
+${currentPrompt.substring(0, maxPromptChars)}${currentPrompt.length > maxPromptChars ? '... [truncated]' : ''}
 
 ANALYSIS OF LAST 24 HOURS ONLY:
 - Total calls analyzed: ${analysis.total}
@@ -890,22 +929,22 @@ ANALYSIS OF LAST 24 HOURS ONLY:
 - Positive examples found: ${analysis.positive_examples.length}
 
 NEW ISSUES ONLY (not previously addressed):
-${JSON.stringify(analysis.new_issues_only, null, 2)}
+${JSON.stringify(analysis.new_issues_only.slice(0, maxNewIssues), null, 2)}
 
-ALL UNHANDLED REQUESTS (for context):
-${JSON.stringify(analysis.unhandled_requests, null, 2)}
+ALL UNHANDLED REQUESTS (sample for context):
+${JSON.stringify(analysis.unhandled_requests.slice(0, maxUnhandledRequests), null, 2)}
 
-EDGE CASES:
-${JSON.stringify(analysis.edge_cases, null, 2)}
+EDGE CASES (sample):
+${JSON.stringify(analysis.edge_cases.slice(0, maxEdgeCases), null, 2)}
 
 POSITIVE EXAMPLES (successful calls to learn from):
-${JSON.stringify(analysis.positive_examples.map(ex => ({
+${JSON.stringify(analysis.positive_examples.slice(0, maxPositiveExamples).map(ex => ({
   call_id: ex.call_id,
   sentiment: ex.sentiment,
   duration_ms: ex.duration,
   key_moments: ex.key_moments,
   outcome: ex.outcome,
-  transcript_excerpt: ex.transcript.substring(0, 500) + '...'
+  transcript_excerpt: ex.transcript_excerpt || (ex.transcript ? ex.transcript.substring(0, 300) + '...' : 'N/A')
 })), null, 2)}
 
 INSTRUCTIONS:
@@ -956,6 +995,30 @@ If no NEW issues are found but positive examples exist, return:
 
 If nothing new to add, return empty object.
 `;
+
+  // FIXED: Estimate and log token usage before sending to prevent overload
+  const estimatedTokens = estimateTokens(improvementPrompt);
+  console.log(`📊 Estimated tokens for OpenAI request: ${estimatedTokens.toLocaleString()}`);
+  
+  if (estimatedTokens > 100000) {
+    console.warn('⚠️ WARNING: Estimated token count is very high (>100K)');
+    console.warn('   This may cause rate limit issues with OpenAI');
+  }
+  
+  if (estimatedTokens > 400000) {
+    console.error('❌ ERROR: Estimated token count exceeds safe limit (>400K)');
+    console.error('   Returning empty improvements to avoid 429 error');
+    return {
+      new_sections: {},
+      modifications: {},
+      sample_scripts: {},
+      best_practices: [],
+      priority_fixes: [],
+      expected_improvement: 'Skipped - too much data',
+      new_patterns_identified: [],
+      error: 'Token limit would be exceeded - analysis skipped'
+    };
+  }
 
   const response = await openai.chat.completions.create({
     model: CONFIG.IMPROVEMENT_MODEL,
