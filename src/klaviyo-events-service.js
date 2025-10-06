@@ -113,6 +113,102 @@ export async function sendDiscountViaEvent({
 }
 
 /**
+ * Send checkout link event to Klaviyo to trigger SMS/Email flow
+ */
+export async function sendCheckoutLinkViaKlaviyoEvent({
+  customerEmail,
+  customerPhone,
+  customerName,
+  checkoutUrl,
+  discountPercentage = '0',
+  channel = 'sms' // 'email' or 'sms'
+}) {
+  const klaviyoApiKey = process.env.KLAVIYO_API_KEY || process.env.KLAVIYO_PRIVATE_KEY;
+  if (!klaviyoApiKey) {
+    throw new Error('Klaviyo API key not configured');
+  }
+
+  try {
+    console.log(`📤 Sending checkout link event to Klaviyo for ${channel}:`, {
+      customerEmail,
+      customerPhone, 
+      customerName,
+      checkoutUrl,
+      discountPercentage,
+      channel
+    });
+    
+    // Send event to trigger checkout link flow
+    const eventData = {
+      data: {
+        type: 'event',
+        attributes: {
+          properties: {
+            checkout_url: checkoutUrl,
+            discount_percentage: discountPercentage,
+            has_discount: discountPercentage && discountPercentage !== '0',
+            channel: channel
+          },
+          metric: {
+            data: {
+              type: 'metric',
+              attributes: {
+                name: 'Grace Checkout Link Requested'
+              }
+            }
+          },
+          profile: {
+            data: {
+              type: 'profile',
+              attributes: channel === 'email' ? {
+                email: customerEmail,
+                first_name: customerName,
+                phone_number: customerPhone || undefined,
+                properties: {
+                  last_checkout_link_sent: new Date().toISOString().split('T')[0]
+                }
+              } : {
+                phone_number: customerPhone,
+                first_name: customerName,
+                email: customerEmail || undefined,
+                properties: {
+                  last_checkout_link_sent: new Date().toISOString().split('T')[0]
+                }
+              }
+            }
+          },
+          time: new Date().toISOString(),
+          unique_id: `checkout-link-${Date.now()}-${customerPhone || customerEmail}`
+        }
+      }
+    };
+
+    const response = await axios.post('https://a.klaviyo.com/api/events/', eventData, {
+      headers: {
+        'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
+        'Content-Type': 'application/json',
+        'revision': '2024-10-15'
+      }
+    });
+
+    console.log(`✅ Klaviyo checkout link event sent for ${channel} to ${channel === 'email' ? customerEmail : customerPhone}`);
+    
+    return {
+      success: true,
+      eventId: response.data?.data?.id || `event-${Date.now()}`,
+      to: channel === 'email' ? customerEmail : customerPhone,
+      status: 'triggered',
+      platform: `klaviyo-${channel}-event`,
+      note: 'Checkout link event sent - will trigger flow if configured'
+    };
+
+  } catch (error) {
+    console.error(`Error sending Klaviyo checkout link ${channel} event:`, error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
  * Send voicemail left event to Klaviyo to trigger SMS follow-up
  */
 export async function sendVoicemailLeftEvent({
@@ -265,5 +361,6 @@ export async function sendVoicemailLeftEvent({
 
 export default {
   sendDiscountViaEvent,
-  sendVoicemailLeftEvent
+  sendVoicemailLeftEvent,
+  sendCheckoutLinkViaKlaviyoEvent
 };
