@@ -1,0 +1,289 @@
+{
+  "knowledge_bases": {
+    "agent_e2636fcbe1c89a7f6bd0731e11": "knowledge_base_fccce10bcd9833f1"
+  },
+  "documents": {
+    "knowledge_base_fccce10bcd9833f1": [
+      {
+        "title": "call_back_handling",
+        "added_date": "2025-10-06T02:57:10.771Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:45:00.795Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:45:00.795Z.json",
+          "type": "section",
+          "keywords": [
+            "voicemail",
+            "cart"
+          ]
+        }
+      },
+      {
+        "title": "unavailable_mailbox",
+        "added_date": "2025-10-06T02:57:11.853Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:45:00.795Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:45:00.795Z.json",
+          "type": "section",
+          "keywords": [
+            "voicemail"
+          ]
+        }
+      },
+      {
+        "title": "UNHANDLED_REQUESTS",
+        "added_date": "2025-10-06T02:57:12.924Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:56:25.033Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:56:25.033Z.json",
+          "type": "section",
+          "keywords": [
+            "order"
+          ]
+        }
+      },
+      {
+        "title": "EDGE_CASE_HANDLING",
+        "added_date": "2025-10-06T02:57:14.000Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:56:25.033Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:56:25.033Z.json",
+          "type": "section",
+          "keywords": [
+            "cart"
+          ]
+        }
+      },
+      {
+        "title": "retry_voicemail",
+        "added_date": "2025-10-06T02:57:15.078Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:52:19.158Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:52:19.158Z.json",
+          "type": "section",
+          "keywords": [
+            "voicemail"
+          ]
+        }
+      },
+      {
+        "title": "retry_discount_request",
+        "added_date": "2025-10-06T02:57:16.158Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:52:19.158Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:52:19.158Z.json",
+          "type": "section",
+          "keywords": [
+            "discount"
+          ]
+        }
+      },
+      {
+        "title": "call_end_confirmation",
+        "added_date": "2025-10-06T02:57:17.245Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:52:19.158Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:52:19.158Z.json",
+          "type": "section",
+          "keywords": [
+            "discount"
+          ]
+        }
+      },
+      {
+        "title": "voicemail_detection_ENHANCED",
+        "added_date": "2025-10-06T02:57:18.332Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:45:00.795Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:45:00.795Z.json",
+          "type": "modification",
+          "keywords": [
+            "voicemail"
+          ]
+        }
+      },
+      {
+        "title": "live_conversation_opening_ENHANCED",
+        "added_date": "2025-10-06T02:57:19.405Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:45:00.795Z",
+          "migration_date": "2025-10-06T02:57:08.694Z",
+          "source": "improvement-2025-09-13T05:45:00.795Z.json",
+          "type": "modification",
+          "keywords": [
+            "price",
+            "cart"
+          ]
+        }
+      },
+      {
+        "title": "conversation_flow_ENHANCED",
+        "added_date": "2025-10-06T02:57:20.512Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:45:00.795Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:45:00.795Z.json",
+          "type": "modification",
+          "keywords": [
+            "checkout",
+            "product",
+            "question"
+          ]
+        }
+      },
+      {
+        "title": "VOICEMAIL_DETECTION_ENHANCED",
+        "added_date": "2025-10-06T02:57:21.596Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:56:25.033Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:56:25.033Z.json",
+          "type": "modification",
+          "keywords": [
+            "voicemail"
+          ]
+        }
+      },
+      {
+        "title": "LIVE_CONVERSATION_OPENING_ENHANCED",
+        "added_date": "2025-10-06T02:57:22.674Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:56:25.033Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:56:25.033Z.json",
+          "type": "modification",
+          "keywords": [
+            "cart",
+            "item",
+            "question"
+          ]
+        }
+      },
+      {
+        "title": "DISCOUNT_DELIVERY_ENHANCED",
+        "added_date": "2025-10-06T02:57:23.783Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:46:48.416Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:46:48.416Z.json",
+          "type": "modification",
+          "keywords": [
+            "discount",
+            "shipping",
+            "order"
+          ]
+        }
+      },
+      {
+        "title": "URGENCY & SCARCITY_ENHANCED",
+        "added_date": "2025-10-06T02:57:24.872Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:56:25.033Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:56:25.033Z.json",
+          "type": "modification",
+          "keywords": [
+            "order",
+            "item"
+          ]
+        }
+      },
+      {
+        "title": "DISCOUNT_DELIVERY - PRIORITIZE TEXT_ENHANCED",
+        "added_date": "2025-10-06T02:57:25.970Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:52:19.158Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:52:19.158Z.json",
+          "type": "modification",
+          "keywords": [
+            "discount"
+          ]
+        }
+      },
+      {
+        "title": "EDGE_CASE_HANDLING_ENHANCED",
+        "added_date": "2025-10-06T02:57:27.054Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:52:19.158Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:52:19.158Z.json",
+          "type": "modification",
+          "keywords": []
+        }
+      },
+      {
+        "title": "DISCOUNT DELIVERY - PRIORITIZE TEXT_ENHANCED",
+        "added_date": "2025-10-06T02:57:28.144Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "original_date": "2025-09-13T05:56:25.033Z",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "source": "improvement-2025-09-13T05:56:25.033Z.json",
+          "type": "modification",
+          "keywords": [
+            "discount"
+          ]
+        }
+      },
+      {
+        "title": "KNOWLEDGE_BASE_OVERVIEW",
+        "added_date": "2025-10-06T02:57:28.274Z",
+        "metadata": {
+          "agent_id": "agent_e2636fcbe1c89a7f6bd0731e11",
+          "agent_name": "Grace - Abandoned Checkout Recovery Specialist",
+          "migration_date": "2025-10-06T02:57:08.695Z",
+          "type": "meta",
+          "keywords": [
+            "voicemail",
+            "discount"
+          ]
+        }
+      }
+    ]
+  },
+  "last_updated": "2025-10-06T02:57:08.693Z",
+  "pending_content": {
+    "agent_e2636fcbe1c89a7f6bd0731e11": []
+  }
+}

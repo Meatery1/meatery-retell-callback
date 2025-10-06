@@ -1,0 +1,61 @@
+{
+  "build_date": "2025-10-06T02:57:28.604Z",
+  "agent": {
+    "agentId": "agent_e2636fcbe1c89a7f6bd0731e11",
+    "llmId": "llm_330631504f69f5507c481d3447bf",
+    "name": "Grace - Abandoned Checkout Recovery Specialist",
+    "function": "abandoned_checkout_recovery"
+  },
+  "improvements": {
+    "total_logs_analyzed": 4,
+    "unique_sections": 7,
+    "modifications": 10,
+    "total_documents": 18
+  },
+  "patterns": {
+    "categories": {
+      "edge_cases": 1,
+      "voicemail_handling": 1,
+      "discount_handling": 1
+    },
+    "top_keywords": {
+      "voicemail": 3,
+      "discount": 2
+    },
+    "themes": [
+      "Strong focus on voicemail detection and handling",
+      "Discount requests and price objections are common"
+    ]
+  },
+  "knowledge_base": {
+    "kb_id": "knowledge_base_fccce10bcd9833f1",
+    "documents_added": 18,
+    "statistics": {
+      "total_documents": 0,
+      "total_size_chars": 0,
+      "last_updated": "2025-10-06T02:57:08.693Z",
+      "documents": []
+    }
+  },
+  "sections_added": [
+    "call_back_handling",
+    "unavailable_mailbox",
+    "UNHANDLED_REQUESTS",
+    "EDGE_CASE_HANDLING",
+    "retry_voicemail",
+    "retry_discount_request",
+    "call_end_confirmation"
+  ],
+  "modifications_added": [
+    "voicemail_detection",
+    "live_conversation_opening",
+    "conversation_flow",
+    "VOICEMAIL_DETECTION",
+    "LIVE_CONVERSATION_OPENING",
+    "DISCOUNT_DELIVERY",
+    "URGENCY & SCARCITY",
+    "DISCOUNT_DELIVERY - PRIORITIZE TEXT",
+    "EDGE_CASE_HANDLING",
+    "DISCOUNT DELIVERY - PRIORITIZE TEXT"
+  ]
+}

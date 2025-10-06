@@ -11,6 +11,7 @@
     "approve": "node src/approve-improvements.js",
     "scheduler": "node src/improvement-scheduler.js",
     "kb:migrate": "node src/scripts/migrate-to-knowledge-base.js",
+    "kb:build-grace": "node src/scripts/build-grace-kb.js",
     "kb:core-prompts": "node src/scripts/create-core-prompts.js",
     "kb:core-prompts:apply": "node src/scripts/create-core-prompts.js --apply",
     "kb:test": "node src/scripts/test-kb-mode.js",
@@ -26,7 +27,7 @@
     "express": "^4.19.2",
     "googleapis": "^144.0.0",
     "openai": "^4.56.0",
-    "retell-sdk": "^3.0.0",
+    "retell-sdk": "^4.49.0",
     "twilio": "^5.0.0"
   }
 }

@@ -56,50 +56,126 @@ export class KnowledgeBaseManager {
   }
 
   /**
+   * Get existing KB content, will be used to preserve when recreating
+   */
+  async getExistingKBContent(kbId) {
+    try {
+      const kb = await this.retell.knowledgeBase.retrieve(kbId);
+      
+      // Extract text sources from the KB
+      const textSources = [];
+      
+      if (kb.knowledge_base_sources) {
+        for (const source of kb.knowledge_base_sources) {
+          // Only extract text type sources, not URLs or files
+          if (source.type === 'text' || source.source_type === 'text') {
+            textSources.push({
+              title: source.title || source.source_title || 'Untitled',
+              text: source.text || source.source_text || source.content || ''
+            });
+          }
+        }
+      }
+      
+      console.log(`   Found ${textSources.length} existing text documents in KB`);
+      return textSources;
+      
+    } catch (error) {
+      console.warn(`⚠️ Could not retrieve existing KB content: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
    * Create or get knowledge base for an agent
+   * Strategy: GET existing KB, retrieve its content, DELETE it, CREATE new one with old + new content
+   * This ensures ONE growing KB, not multiple
    */
   async ensureKnowledgeBase(agentId, agentName) {
     if (!this.cache) await this.loadCache();
 
-    // Check cache first
+    // KB name must be < 40 characters per Retell API requirement
+    const kbName = `${agentName.split(' - ')[0]} KB`; // e.g. "Grace KB"
+    let existingContent = [];
+    let oldKbId = null;
+    
+    // Check cache for existing KB
     if (this.cache.knowledge_bases[agentId]) {
-      console.log(`✅ Using cached KB for ${agentName}: ${this.cache.knowledge_bases[agentId]}`);
-      return this.cache.knowledge_bases[agentId];
+      oldKbId = this.cache.knowledge_bases[agentId];
+      console.log(`📖 Found cached KB: ${oldKbId}`);
     }
-
-    const kbName = `${agentName} - Fringe Cases & Learnings`;
+    
+    // Or look for it in the list
+    if (!oldKbId) {
+      try {
+        console.log(`🔍 Looking for existing knowledge base...`);
+        const kbList = await this.retell.knowledgeBase.list();
+        const existingKB = kbList.find(kb => kb.knowledge_base_name === kbName);
+        
+        if (existingKB) {
+          oldKbId = existingKB.knowledge_base_id;
+          console.log(`📖 Found existing KB: ${oldKbId}`);
+        }
+      } catch (listError) {
+        console.log(`⚠️ Could not list KBs: ${listError.message}`);
+      }
+    }
+    
+    // If existing KB found, get its content before deletion
+    if (oldKbId) {
+      console.log(`📚 Retrieving existing KB content to preserve...`);
+      existingContent = await this.getExistingKBContent(oldKbId);
+      
+      // Delete the old KB
+      try {
+        console.log(`🗑️  Deleting old KB to recreate with updated content...`);
+        await this.retell.knowledgeBase.delete(oldKbId);
+        console.log(`✅ Old KB deleted`);
+      } catch (deleteError) {
+        console.warn(`⚠️ Could not delete old KB: ${deleteError.message}`);
+        // Continue anyway, we'll create a new one
+      }
+    }
+    
+    // Store existing content for later merging
+    this.cache.pending_content = this.cache.pending_content || {};
+    this.cache.pending_content[agentId] = existingContent;
+    
+    console.log(`📚 Creating knowledge base: "${kbName}"...`);
+    console.log(`   Preserving ${existingContent.length} existing documents`);
     
     try {
-      // Try to find existing KB
-      console.log(`🔍 Looking for existing KB: "${kbName}"...`);
-      const kbList = await this.retell.knowledgeBase.list();
+      // Create new KB - start simple with just the name
+      console.log(`   Creating with ${existingContent.length} documents...`);
       
-      let kb = kbList.find(k => k.name === kbName);
+      const allSources = [{
+        title: 'Introduction',
+        text: `Knowledge base for ${agentName}. Updated: ${new Date().toISOString()}`
+      }];
       
-      if (!kb) {
-        // Create new KB
-        console.log(`📚 Creating new knowledge base: "${kbName}"...`);
-        kb = await this.retell.knowledgeBase.create({
-          name: kbName,
-          text_content: [{
-            title: 'Introduction',
-            body: `This knowledge base contains fringe cases, edge scenarios, and specific objections learned from real customer interactions for ${agentName}.`
-          }]
-        });
-        console.log(`✅ Created KB: ${kb.knowledge_base_id}`);
-      } else {
-        console.log(`✅ Found existing KB: ${kb.knowledge_base_id}`);
+      // Add existing content to initial creation
+      if (existingContent.length > 0) {
+        allSources.push(...existingContent);
       }
+      
+      const kb = await this.retell.knowledgeBase.create({
+        knowledge_base_name: kbName,
+        knowledge_base_texts: allSources
+      });
+      
+      const newKbId = kb.knowledge_base_id;
+      console.log(`✅ Created new KB: ${newKbId} with ${allSources.length} documents`);
 
-      // Cache it
-      this.cache.knowledge_bases[agentId] = kb.knowledge_base_id;
+      // Cache the new KB ID
+      this.cache.knowledge_bases[agentId] = newKbId;
       this.cache.last_updated = new Date().toISOString();
       await this.saveCache();
 
-      return kb.knowledge_base_id;
+      return newKbId;
       
     } catch (error) {
       console.error('❌ Error managing knowledge base:', error.message);
+      console.error('Full error:', error);
       throw error;
     }
   }
@@ -111,19 +187,11 @@ export class KnowledgeBaseManager {
     try {
       console.log(`📝 Adding learning: "${section}" to KB ${knowledgeBaseId}...`);
       
-      // Check if document with this title already exists
-      const existing = await this.findDocument(knowledgeBaseId, section);
-      
-      if (existing) {
-        console.log(`⚠️ Document "${section}" already exists, updating instead...`);
-        return await this.updateLearning(knowledgeBaseId, existing.document_id, content, metadata);
-      }
-
-      // Create document in KB
-      const result = await this.retell.knowledgeBase.update(knowledgeBaseId, {
-        text_content: [{
+      // Add as text source to KB using the proper API
+      const result = await this.retell.knowledgeBase.addSources(knowledgeBaseId, {
+        knowledge_base_texts: [{
           title: section,
-          body: this.formatLearningContent(section, content, metadata)
+          text: this.formatLearningContent(section, content, metadata)
         }]
       });
 
@@ -145,6 +213,7 @@ export class KnowledgeBaseManager {
       
     } catch (error) {
       console.error(`❌ Failed to add learning "${section}":`, error.message);
+      console.error('Full error:', error);
       throw error;
     }
   }

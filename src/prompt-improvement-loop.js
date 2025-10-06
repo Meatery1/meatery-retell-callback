@@ -30,7 +30,11 @@ import { KnowledgeBaseManager } from './knowledge-base-manager.js';
 // Load environment variables
 dotenv.config();
 
-const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
+// Initialize Retell with extended timeout for KB operations
+const retell = new Retell({ 
+  apiKey: process.env.RETELL_API_KEY,
+  timeout: 300000 // 5 minutes for KB operations
+});
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Initialize Knowledge Base Manager
@@ -48,8 +52,9 @@ const CONFIG = {
   PREVIOUS_IMPROVEMENTS_TO_REVIEW: 30, // Look at last 30 improvement logs
   
   // NEW: Knowledge Base Configuration
-  USE_KNOWLEDGE_BASE: process.env.USE_KNOWLEDGE_BASE === 'true' || false, // Toggle: 'true' for KB, 'false' for prompt
+  USE_KNOWLEDGE_BASE: process.env.USE_KNOWLEDGE_BASE === 'true' || true, // Default to KB mode now that Grace KB is built
   CORE_PROMPT_MAX_TOKENS: 3000, // Keep core prompt under this limit
+  ANALYZE_FULL_TRANSCRIPTS: true, // Analyze complete transcripts, not just summaries
   
   // Agent filtering options
   AGENT_FILTERS: {
@@ -481,7 +486,7 @@ async function fetchAndAnalyzeCalls() {
         agent_id: agent.id,
         start_timestamp: analysisWindow.start,
         end_timestamp: analysisWindow.end,
-        limit: 100
+        limit: 1000 // Increased to get ALL calls in 24 hours
       });
       
       // Filter for phone calls only (exclude web calls)
@@ -491,6 +496,26 @@ async function fetchAndAnalyzeCalls() {
       });
       
       console.log(`   - Found ${agentCalls.length} total calls, ${phoneCalls.length} phone calls`);
+      
+      // If analyzing full transcripts, fetch complete call details
+      if (CONFIG.ANALYZE_FULL_TRANSCRIPTS) {
+        console.log(`   📄 Fetching full transcripts for ${phoneCalls.length} calls...`);
+        
+        for (let i = 0; i < phoneCalls.length; i++) {
+          try {
+            const fullCall = await retell.call.retrieve(phoneCalls[i].call_id);
+            // Replace with full call data including complete transcript
+            phoneCalls[i] = fullCall;
+            
+            if ((i + 1) % 10 === 0) {
+              console.log(`      ... ${i + 1}/${phoneCalls.length} transcripts loaded`);
+            }
+          } catch (callError) {
+            console.warn(`      ⚠️ Could not fetch transcript for ${phoneCalls[i].call_id}`);
+          }
+        }
+        console.log(`   ✅ Loaded ${phoneCalls.length} complete transcripts`);
+      }
       
       // Add agent info to each call
       phoneCalls.forEach(call => {
@@ -552,7 +577,9 @@ async function fetchAndAnalyzeCalls() {
     common_issues: {},
     unhandled_requests: [],
     previously_addressed: previouslyAddressed,
-    new_issues_only: [] // Track only NEW issues
+    new_issues_only: [], // Track only NEW issues
+    positive_examples: [], // NEW: Track positive calls as sample scripts
+    best_practices: [] // NEW: Extract best practices from successful calls
   };
 
   // Initialize agent-specific analysis for all discovered agents
@@ -640,9 +667,72 @@ async function fetchAndAnalyzeCalls() {
         resolution: call.call_analysis?.custom_analysis_data?.resolution_preference
       });
     }
+    
+    // NEW: Capture positive sentiment calls as sample scripts
+    if (call.call_analysis?.user_sentiment === 'Positive' || 
+        call.call_analysis?.user_sentiment === 'very_satisfied' ||
+        call.call_analysis?.call_successful === true) {
+      
+      // Only include calls with substantial conversation (not just voicemail)
+      if (transcript.length > 200 && !call.call_analysis?.in_voicemail) {
+        analysis.positive_examples.push({
+          call_id: call.call_id,
+          agent_id: agentId,
+          agent_name: call.agent_info.name,
+          sentiment: call.call_analysis?.user_sentiment,
+          transcript: transcript,
+          duration: call.end_timestamp - call.start_timestamp,
+          call_successful: call.call_analysis?.call_successful,
+          key_moments: extractKeyMoments(transcript),
+          outcome: extractOutcome(call.call_analysis)
+        });
+      }
+    }
   }
 
   return analysis;
+}
+
+/**
+ * Extract key moments from a successful call
+ */
+function extractKeyMoments(transcript) {
+  const moments = [];
+  
+  // Look for objection handling
+  if (transcript.match(/price|expensive|cost too much/i)) {
+    moments.push('Handled price objection successfully');
+  }
+  
+  // Look for discount delivery
+  if (transcript.match(/discount|code|promo/i)) {
+    moments.push('Successfully delivered discount offer');
+  }
+  
+  // Look for order completion
+  if (transcript.match(/complete|finish|checkout|order/i)) {
+    moments.push('Guided customer to complete order');
+  }
+  
+  // Look for rapport building
+  if (transcript.match(/thank you|appreciate|helpful|great/i)) {
+    moments.push('Built positive rapport');
+  }
+  
+  return moments;
+}
+
+/**
+ * Extract outcome from call analysis
+ */
+function extractOutcome(callAnalysis) {
+  if (!callAnalysis) return 'Unknown';
+  
+  if (callAnalysis.call_successful) {
+    return callAnalysis.custom_analysis_data?.resolution_preference || 'Successful interaction';
+  }
+  
+  return 'Unknown outcome';
 }
 
 function addIssue(issues, type, call) {
@@ -797,6 +887,7 @@ ANALYSIS OF LAST 24 HOURS ONLY:
 - Success rate: ${((analysis.successful.length / analysis.total) * 100).toFixed(1)}%
 - Voicemail encounters: ${analysis.voicemail.length}
 - Failed calls: ${analysis.failed.length}
+- Positive examples found: ${analysis.positive_examples.length}
 
 NEW ISSUES ONLY (not previously addressed):
 ${JSON.stringify(analysis.new_issues_only, null, 2)}
@@ -807,14 +898,25 @@ ${JSON.stringify(analysis.unhandled_requests, null, 2)}
 EDGE CASES:
 ${JSON.stringify(analysis.edge_cases, null, 2)}
 
+POSITIVE EXAMPLES (successful calls to learn from):
+${JSON.stringify(analysis.positive_examples.map(ex => ({
+  call_id: ex.call_id,
+  sentiment: ex.sentiment,
+  duration_ms: ex.duration,
+  key_moments: ex.key_moments,
+  outcome: ex.outcome,
+  transcript_excerpt: ex.transcript.substring(0, 500) + '...'
+})), null, 2)}
+
 INSTRUCTIONS:
 1. Look for NEW questions the agent has never received before
 2. Identify UNIQUE objections or scenarios
 3. Focus on FRINGE CASES that are rare but important
 4. DO NOT repeat fixes for issues that have already been addressed
-5. If no NEW issues are found, return an empty improvements object
+5. Extract SAMPLE SCRIPTS from positive examples that can be used as best practices
+6. If no NEW issues are found but positive examples exist, create sample script sections
 
-Based on this analysis, provide ONLY improvements for NEW issues:
+Based on this analysis, provide ONLY improvements for NEW issues and best practices:
 
 Format your response as a JSON object with:
 {
@@ -826,19 +928,33 @@ Format your response as a JSON object with:
     "existing_section": "how to enhance for NEW scenario",
     ...
   },
+  "sample_scripts": {
+    "scenario_name": "Example conversation from positive call showing how to handle this well",
+    ...
+  },
+  "best_practices": [
+    "Specific technique observed in successful calls",
+    ...
+  ],
   "priority_fixes": ["only NEW fixes", ...],
   "expected_improvement": "percentage or description",
   "new_patterns_identified": ["list of NEW patterns found", ...]
 }
 
-If no NEW issues are found, return:
+If no NEW issues are found but positive examples exist, return:
 {
   "new_sections": {},
   "modifications": {},
+  "sample_scripts": {
+    "scenario": "example from successful call"
+  },
+  "best_practices": ["techniques from positive calls"],
   "priority_fixes": [],
-  "expected_improvement": "No new issues identified - system working well",
+  "expected_improvement": "Reinforcing successful patterns",
   "new_patterns_identified": []
 }
+
+If nothing new to add, return empty object.
 `;
 
   const response = await openai.chat.completions.create({
@@ -975,15 +1091,19 @@ async function applyImprovements(improvements, discoveredAgents, requireApproval
 async function applyImprovementsToKnowledgeBase(improvements, discoveredAgents) {
   console.log('📚 Applying improvements to Knowledge Base...');
   
-  // Check if there are actually any improvements to apply
+  // Check if there are actually any improvements to apply (including sample scripts)
   const hasImprovements = 
     (improvements.new_sections && Object.keys(improvements.new_sections).length > 0) ||
-    (improvements.modifications && Object.keys(improvements.modifications).length > 0);
+    (improvements.modifications && Object.keys(improvements.modifications).length > 0) ||
+    (improvements.sample_scripts && Object.keys(improvements.sample_scripts).length > 0) ||
+    (improvements.best_practices && improvements.best_practices.length > 0);
   
   if (!hasImprovements) {
     console.log('✅ No new improvements needed - all issues already addressed or system working well');
     return [];
   }
+  
+  console.log(`   📊 Adding: ${Object.keys(improvements.new_sections || {}).length} sections, ${Object.keys(improvements.modifications || {}).length} mods, ${Object.keys(improvements.sample_scripts || {}).length} scripts, ${improvements.best_practices?.length || 0} practices`);
   
   // Validate improvements for safety
   if (!validateImprovements(improvements)) {
@@ -1043,6 +1163,42 @@ async function applyImprovementsToKnowledgeBase(improvements, discoveredAgents) 
             }
           });
         }
+      }
+      
+      // NEW: Add sample scripts from successful calls
+      if (improvements.sample_scripts) {
+        for (const [scenario, script] of Object.entries(improvements.sample_scripts)) {
+          learnings.push({
+            section: `SAMPLE_SCRIPT_${scenario}`,
+            content: script,
+            metadata: {
+              agent_id: agent.id,
+              agent_name: agent.name,
+              issue_type: 'sample_script',
+              category: 'best_practice',
+              created_date: new Date().toISOString(),
+              source: 'positive_call_analysis',
+              keywords: extractKeywords(script)
+            }
+          });
+        }
+      }
+      
+      // NEW: Add best practices document if found
+      if (improvements.best_practices && improvements.best_practices.length > 0) {
+        learnings.push({
+          section: 'BEST_PRACTICES_LEARNED',
+          content: `Techniques observed in successful calls:\n\n${improvements.best_practices.map((practice, i) => `${i + 1}. ${practice}`).join('\n')}`,
+          metadata: {
+            agent_id: agent.id,
+            agent_name: agent.name,
+            issue_type: 'best_practices',
+            category: 'success_patterns',
+            created_date: new Date().toISOString(),
+            source: 'positive_call_analysis',
+            keywords: ['best', 'practice', 'success', 'positive']
+          }
+        });
       }
       
       // Add learnings to knowledge base in batch
@@ -1260,6 +1416,7 @@ async function runImprovementLoop() {
     console.log(`   - Success rate: ${((analysis.successful.length / analysis.total) * 100).toFixed(1)}%`);
     console.log(`   - Total unhandled requests: ${analysis.unhandled_requests.length}`);
     console.log(`   - NEW issues (not previously addressed): ${analysis.new_issues_only.length}`);
+    console.log(`   - Positive examples (for sample scripts): ${analysis.positive_examples.length}`);
     console.log(`   - Edge cases: ${analysis.edge_cases.length}`);
     console.log(`   - Agents discovered: ${analysis.discovered_agents.length}`);
     console.log(`   - Previously addressed: ${analysis.previously_addressed.sections.length} sections, ${analysis.previously_addressed.fixes.length} fixes`);
@@ -1293,6 +1450,8 @@ async function runImprovementLoop() {
     console.log(`   - New patterns identified: ${improvements.new_patterns_identified?.length || 0}`);
     console.log(`   - New sections to add: ${Object.keys(improvements.new_sections || {}).length}`);
     console.log(`   - Modifications suggested: ${Object.keys(improvements.modifications || {}).length}`);
+    console.log(`   - Sample scripts extracted: ${Object.keys(improvements.sample_scripts || {}).length}`);
+    console.log(`   - Best practices identified: ${improvements.best_practices?.length || 0}`);
     console.log(`   - Priority fixes: ${improvements.priority_fixes?.join(', ') || 'None'}`);
     console.log(`   - Expected improvement: ${improvements.expected_improvement}`);
     
