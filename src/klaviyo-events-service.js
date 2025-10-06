@@ -153,7 +153,7 @@ export async function sendCheckoutLinkViaKlaviyoEvent({
             data: {
               type: 'metric',
               attributes: {
-                name: 'Grace Checkout Link Requested'
+                name: 'Abandoned Checkout Link Sent'
               }
             }
           },

@@ -26,8 +26,8 @@ Dynamic variables provided:
 **Changed from:** Direct Twilio SMS → **To:** Klaviyo Event triggering a Flow
 
 The tool now follows the same pattern as the `send-discount` endpoint:
-1. Creates a Klaviyo event: `"Grace Checkout Link Requested"`
-2. A Klaviyo Flow (to be created) listens for this event
+1. Creates a Klaviyo event: `"Abandoned Checkout Link Sent"`
+2. The existing Klaviyo Flow listens for this event
 3. The Flow sends the SMS/Email to the customer
 
 ### Solution 2: Auto-Fetch Checkout URL from Shopify ✨
@@ -53,7 +53,7 @@ When `{{checkout_url}}` is not provided (or is a template string), the tool now:
 
 ### 2. Created `sendCheckoutLinkViaKlaviyoEvent` in `src/klaviyo-events-service.js`
 - **Lines 115-209**: New function to send Klaviyo event
-- Sends event with metric: `"Grace Checkout Link Requested"`
+- Sends event with metric: `"Abandoned Checkout Link Sent"`
 - Includes properties:
   - `checkout_url`
   - `discount_percentage`
@@ -63,13 +63,11 @@ When `{{checkout_url}}` is not provided (or is a template string), the tool now:
 
 ## Next Steps: Klaviyo Flow Setup
 
-### Create a new Flow in Klaviyo:
+### Use Existing Flow in Klaviyo:
 
-1. **Go to Klaviyo → Flows → Create Flow**
-
-2. **Trigger Setup:**
+Your flow is already set up with trigger:
    - Trigger Type: `Metric` (API Event)
-   - Metric: `Grace Checkout Link Requested`
+   - Metric: `Abandoned Checkout Link Sent` ✅
 
 3. **Add SMS Action:**
    - Add an SMS message
@@ -113,8 +111,8 @@ When `{{checkout_url}}` is not provided (or is a template string), the tool now:
 1. Make a test call to the abandoned checkout agent
 2. When asked if you want the checkout link, say "yes, text it to me"
 3. The agent should call the `send_checkout_link` tool
-4. Check Klaviyo → Metrics → "Grace Checkout Link Requested" for the event
-5. If the Flow is set up, you should receive the SMS
+4. Check Klaviyo → Metrics → "Abandoned Checkout Link Sent" for the event
+5. The Flow should automatically trigger and send the SMS
 
 ### Expected Logs:
 ```
