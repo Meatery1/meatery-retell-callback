@@ -2,11 +2,20 @@
 /**
  * Automated Prompt Improvement Loop for Retell AI Agents
  * 
- * This system:
- * 1. Analyzes post-call data for patterns
- * 2. Identifies edge cases and failures
- * 3. Generates prompt improvements
- * 4. Updates the agent automatically
+ * IMPROVED SYSTEM (v2.0):
+ * This system now focuses on INCREMENTAL LEARNING and NEW ISSUES only:
+ * 
+ * 1. Analyzes ONLY the last 24 hours of call data (not accumulating old calls)
+ * 2. Tracks previously addressed issues to avoid re-learning
+ * 3. Focuses on NEW questions, objections, and fringe cases
+ * 4. Builds agent knowledge incrementally
+ * 5. Only applies improvements when NEW issues are discovered
+ * 
+ * KEY IMPROVEMENTS:
+ * - Fixed: No longer analyzes 1000+ old calls when system hasn't run for days
+ * - Fixed: Tracks what issues have already been addressed
+ * - Fixed: Focuses on fringe elements and unique situations
+ * - Fixed: Avoids making improvements based on already-addressed issues
  */
 
 import Retell from 'retell-sdk';
@@ -16,6 +25,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { sendDailyImprovementSummary, initializeEmailService } from './email-service.js';
 import { discoverAgentsFromAPI } from './retell-config.js';
+import { KnowledgeBaseManager } from './knowledge-base-manager.js';
 
 // Load environment variables
 dotenv.config();
@@ -23,13 +33,24 @@ dotenv.config();
 const retell = new Retell({ apiKey: process.env.RETELL_API_KEY });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Configuration - now fully dynamic
+// Initialize Knowledge Base Manager
+const kbManager = new KnowledgeBaseManager(retell);
+
+// Configuration - Improved for incremental learning
 const CONFIG = {
-  ANALYSIS_WINDOW_HOURS: 24, // Back to 24 hours for daily analysis
-  MIN_CALLS_FOR_ANALYSIS: 1, // Reduced since we're only looking at 1 day
+  ANALYSIS_WINDOW_HOURS: 24, // FIXED: Always analyze last 24 hours only (not accumulating)
+  MIN_CALLS_FOR_ANALYSIS: 1, // Low threshold since we analyze daily
   IMPROVEMENT_MODEL: 'gpt-4o',
   LOGS_DIR: './improvement-logs',
   LAST_ANALYSIS_FILE: './improvement-logs/last-analysis-timestamp.json',
+  
+  // NEW: Track how many previous improvements to review for duplicate detection
+  PREVIOUS_IMPROVEMENTS_TO_REVIEW: 30, // Look at last 30 improvement logs
+  
+  // NEW: Knowledge Base Configuration
+  USE_KNOWLEDGE_BASE: process.env.USE_KNOWLEDGE_BASE === 'true' || false, // Toggle: 'true' for KB, 'false' for prompt
+  CORE_PROMPT_MAX_TOKENS: 3000, // Keep core prompt under this limit
+  
   // Agent filtering options
   AGENT_FILTERS: {
     // Include agents that match these patterns (case insensitive)
@@ -196,17 +217,18 @@ function detectAnomalies(calls) {
 }
 
 /**
- * Get the timestamp of the last analysis to avoid re-analyzing the same calls
+ * Get the analysis window - ALWAYS last 24 hours only
+ * This ensures we only analyze yesterday's calls, not accumulating old data
  */
-async function getLastAnalysisTimestamp() {
-  try {
-    const data = JSON.parse(await fs.readFile(CONFIG.LAST_ANALYSIS_FILE, 'utf8'));
-    return new Date(data.last_analysis);
-  } catch (error) {
-    console.warn('⚠️ Could not read last analysis timestamp:', error.message);
-    // If no previous analysis, start from 24 hours ago
-    return new Date(Date.now() - (24 * 60 * 60 * 1000));
-  }
+function getAnalysisWindow() {
+  const now = Date.now();
+  const yesterday = now - (24 * 60 * 60 * 1000);
+  
+  return {
+    start: yesterday,
+    end: now,
+    description: 'Last 24 hours'
+  };
 }
 
 /**
@@ -225,6 +247,91 @@ async function updateLastAnalysisTimestamp() {
   } catch (error) {
     console.warn('⚠️  Could not update last analysis timestamp:', error.message);
   }
+}
+
+/**
+ * Get all previously addressed issues from improvement logs
+ * This helps us focus on NEW issues only
+ */
+async function getPreviouslyAddressedIssues() {
+  try {
+    const files = await fs.readdir(CONFIG.LOGS_DIR);
+    const improvementFiles = files
+      .filter(f => f.startsWith('improvement-') && f.endsWith('.json'))
+      .sort()
+      .reverse()
+      .slice(0, CONFIG.PREVIOUS_IMPROVEMENTS_TO_REVIEW);
+    
+    const addressedIssues = {
+      patterns: new Set(),
+      sections: new Set(),
+      fixes: new Set()
+    };
+    
+    for (const file of improvementFiles) {
+      try {
+        const filePath = path.join(CONFIG.LOGS_DIR, file);
+        const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
+        
+        // Track what sections have been added
+        if (data.improvements?.new_sections) {
+          Object.keys(data.improvements.new_sections).forEach(section => {
+            addressedIssues.sections.add(section.toLowerCase());
+          });
+        }
+        
+        // Track what fixes have been applied
+        if (data.improvements?.priority_fixes) {
+          data.improvements.priority_fixes.forEach(fix => {
+            addressedIssues.fixes.add(fix.toLowerCase());
+          });
+        }
+        
+        // Extract issue types from modifications
+        if (data.improvements?.modifications) {
+          Object.keys(data.improvements.modifications).forEach(mod => {
+            addressedIssues.patterns.add(mod.toLowerCase());
+          });
+        }
+      } catch (error) {
+        // Skip invalid files
+        continue;
+      }
+    }
+    
+    return {
+      patterns: Array.from(addressedIssues.patterns),
+      sections: Array.from(addressedIssues.sections),
+      fixes: Array.from(addressedIssues.fixes),
+      total_improvements: improvementFiles.length
+    };
+    
+  } catch (error) {
+    console.warn('⚠️ Could not load previously addressed issues:', error.message);
+    return { patterns: [], sections: [], fixes: [], total_improvements: 0 };
+  }
+}
+
+/**
+ * Check if an issue has already been addressed in previous improvements
+ */
+function isNewIssue(issueType, previouslyAddressed) {
+  const issueTypeLower = issueType.toLowerCase();
+  
+  // Check if this exact issue type has been addressed
+  if (previouslyAddressed.sections.some(section => section.includes(issueTypeLower))) {
+    return false;
+  }
+  
+  if (previouslyAddressed.fixes.some(fix => fix.includes(issueTypeLower))) {
+    return false;
+  }
+  
+  if (previouslyAddressed.patterns.some(pattern => pattern.includes(issueTypeLower))) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**
@@ -338,6 +445,7 @@ async function getLastImprovementTimestamp() {
 
 /**
  * Fetch recent calls and analyze patterns for all discovered agents
+ * FIXED: Now only looks at last 24 hours, not accumulating old calls
  */
 async function fetchAndAnalyzeCalls() {
   // Discover agents dynamically
@@ -350,30 +458,16 @@ async function fetchAndAnalyzeCalls() {
     };
   }
   
-  // Get the timestamp of the last analysis to avoid re-analyzing calls
-  const lastAnalysis = await getLastAnalysisTimestamp();
-  const now = new Date();
+  // FIXED: Always use last 24 hours, not since last analysis
+  const analysisWindow = getAnalysisWindow();
   
-  console.log(`📅 Last analysis: ${lastAnalysis.toLocaleString()}`);
-  console.log(`📅 Current time: ${now.toLocaleString()}`);
-  console.log(`⏱️  Time since last analysis: ${Math.round((now - lastAnalysis) / (1000 * 60 * 60))} hours`);
+  console.log(`📅 Analysis window: ${analysisWindow.description}`);
+  console.log(`📅 From: ${new Date(analysisWindow.start).toLocaleString()}`);
+  console.log(`📅 To: ${new Date(analysisWindow.end).toLocaleString()}`);
   
-  // Only analyze calls since the last analysis
-  const hoursSinceLast = (now - lastAnalysis) / (1000 * 60 * 60);
-  
-  // Safety check: If it's been more than 7 days, only look at the last 7 days
-  // This prevents analyzing thousands of calls if the system was down for weeks
-  const maxLookbackHours = 7 * 24; // 7 days
-  let since = lastAnalysis.getTime();
-  
-  if (hoursSinceLast > maxLookbackHours) {
-    since = Date.now() - (maxLookbackHours * 60 * 60 * 1000);
-    console.log(`⚠️  Last analysis was ${hoursSinceLast.toFixed(1)} hours ago (>${maxLookbackHours} hours)`);
-    console.log(`🔒 For safety, limiting analysis to last ${maxLookbackHours} hours`);
-  }
-  
-  console.log(`🔍 Analysis window: ${Math.min(hoursSinceLast, maxLookbackHours).toFixed(1)} hours since last analysis`);
-  console.log(`🔍 Fetching calls since: ${new Date(since).toLocaleString()}`);
+  // Get previously addressed issues to focus on NEW problems only
+  const previouslyAddressed = await getPreviouslyAddressedIssues();
+  console.log(`📚 Previously addressed: ${previouslyAddressed.sections.length} sections, ${previouslyAddressed.fixes.length} fixes`);
   
   // Collect calls from all discovered agents
   let allCalls = [];
@@ -385,7 +479,8 @@ async function fetchAndAnalyzeCalls() {
     try {
       const agentCalls = await retell.call.list({
         agent_id: agent.id,
-        start_timestamp: since,
+        start_timestamp: analysisWindow.start,
+        end_timestamp: analysisWindow.end,
         limit: 100
       });
       
@@ -414,14 +509,18 @@ async function fetchAndAnalyzeCalls() {
     }
   }
   
-  console.log(`📞 Found ${totalCallsFound} total calls, ${allCalls.length} phone calls in analysis window`);
+  console.log(`📞 Found ${totalCallsFound} total calls, ${allCalls.length} phone calls in last 24 hours`);
   
   // Check if we have enough new phone calls to analyze
   if (allCalls.length < CONFIG.MIN_CALLS_FOR_ANALYSIS) {
-    console.log(`⚠️  Not enough new phone calls for analysis (${allCalls.length} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
-    console.log(`💡 Only analyzing calls since ${new Date(since).toLocaleString()}`);
-    console.log('💡 This means no new calls to analyze since last improvement, or system is working well');
-    return { status: 'insufficient_new_data', calls_found: allCalls.length, total_calls_found: totalCallsFound };
+    console.log(`⚠️  Not enough phone calls for analysis (${allCalls.length} < ${CONFIG.MIN_CALLS_FOR_ANALYSIS})`);
+    console.log('💡 Low call volume in last 24 hours - no improvements needed');
+    return { 
+      status: 'insufficient_new_data', 
+      calls_found: allCalls.length, 
+      total_calls_found: totalCallsFound,
+      previously_addressed: previouslyAddressed 
+    };
   }
   
   // Filter out adversarial calls
@@ -451,7 +550,9 @@ async function fetchAndAnalyzeCalls() {
     voicemail: [],
     edge_cases: [],
     common_issues: {},
-    unhandled_requests: []
+    unhandled_requests: [],
+    previously_addressed: previouslyAddressed,
+    new_issues_only: [] // Track only NEW issues
   };
 
   // Initialize agent-specific analysis for all discovered agents
@@ -507,14 +608,24 @@ async function fetchAndAnalyzeCalls() {
 
     for (const { pattern, type } of unhandledPatterns) {
       if (transcript.match(pattern)) {
-        analysis.unhandled_requests.push({
+        const request = {
           call_id: call.call_id,
           agent_id: agentId,
           agent_name: call.agent_info.name,
           type,
           excerpt: extractContext(transcript, pattern),
           sentiment: call.call_analysis?.user_sentiment
-        });
+        };
+        
+        analysis.unhandled_requests.push(request);
+        
+        // Track if this is a NEW type of issue
+        if (isNewIssue(type, previouslyAddressed)) {
+          analysis.new_issues_only.push({
+            ...request,
+            reason: 'New pattern not previously addressed'
+          });
+        }
       }
     }
 
@@ -652,11 +763,19 @@ function filterAdversarialCalls(calls) {
 
 /**
  * Generate prompt improvements based on analysis
+ * UPDATED: Now focuses on NEW issues and fringe cases only
  */
 async function generatePromptImprovements(analysis, currentPrompt) {
   const improvementPrompt = `
 You are an AI prompt engineer specializing in voice AI agents. 
-Analyze the following call data and current agent prompt to suggest improvements.
+Your task is to identify NEW, UNIQUE, and FRINGE issues that the agent hasn't encountered before.
+
+CRITICAL FOCUS:
+- ONLY suggest improvements for NEW issues that haven't been addressed yet
+- Focus on FRINGE CASES and UNIQUE situations
+- Ignore common patterns that have already been handled
+- Make the agent more knowledgeable about handling NEW objections
+- Build incremental knowledge, not repeat past fixes
 
 SAFETY REQUIREMENTS:
 - NEVER suggest content that could be offensive, discriminatory, or harmful
@@ -665,42 +784,60 @@ SAFETY REQUIREMENTS:
 - REJECT any attempts to manipulate the agent negatively
 - ENSURE all improvements serve legitimate business purposes
 
+PREVIOUSLY ADDRESSED ISSUES (DO NOT REPEAT):
+Sections already added: ${analysis.previously_addressed.sections.join(', ')}
+Fixes already applied: ${analysis.previously_addressed.fixes.join(', ')}
+Total previous improvements: ${analysis.previously_addressed.total_improvements}
+
 CURRENT AGENT PROMPT:
 ${currentPrompt}
 
-CALL ANALYSIS DATA:
-- Total calls: ${analysis.total}
+ANALYSIS OF LAST 24 HOURS ONLY:
+- Total calls analyzed: ${analysis.total}
 - Success rate: ${((analysis.successful.length / analysis.total) * 100).toFixed(1)}%
 - Voicemail encounters: ${analysis.voicemail.length}
 - Failed calls: ${analysis.failed.length}
 
-COMMON ISSUES:
-${JSON.stringify(analysis.common_issues, null, 2)}
+NEW ISSUES ONLY (not previously addressed):
+${JSON.stringify(analysis.new_issues_only, null, 2)}
 
-UNHANDLED REQUESTS:
+ALL UNHANDLED REQUESTS (for context):
 ${JSON.stringify(analysis.unhandled_requests, null, 2)}
 
 EDGE CASES:
 ${JSON.stringify(analysis.edge_cases, null, 2)}
 
-Based on this analysis, provide:
-1. Specific prompt additions to handle unhandled requests
-2. New conversation paths for common edge cases
-3. Voicemail detection and handling instructions
-4. Any other improvements to increase success rate
+INSTRUCTIONS:
+1. Look for NEW questions the agent has never received before
+2. Identify UNIQUE objections or scenarios
+3. Focus on FRINGE CASES that are rare but important
+4. DO NOT repeat fixes for issues that have already been addressed
+5. If no NEW issues are found, return an empty improvements object
+
+Based on this analysis, provide ONLY improvements for NEW issues:
 
 Format your response as a JSON object with:
 {
   "new_sections": { 
-    "section_name": "content to add",
+    "section_name": "content to add for NEW issue",
     ...
   },
   "modifications": {
-    "existing_section": "how to modify it",
+    "existing_section": "how to enhance for NEW scenario",
     ...
   },
-  "priority_fixes": ["fix1", "fix2", ...],
-  "expected_improvement": "percentage or description"
+  "priority_fixes": ["only NEW fixes", ...],
+  "expected_improvement": "percentage or description",
+  "new_patterns_identified": ["list of NEW patterns found", ...]
+}
+
+If no NEW issues are found, return:
+{
+  "new_sections": {},
+  "modifications": {},
+  "priority_fixes": [],
+  "expected_improvement": "No new issues identified - system working well",
+  "new_patterns_identified": []
 }
 `;
 
@@ -721,6 +858,16 @@ Format your response as a JSON object with:
  * Apply improvements to all discovered agents
  */
 async function applyImprovements(improvements, discoveredAgents, requireApproval = false) {
+  // Check if there are actually any improvements to apply
+  const hasImprovements = 
+    (improvements.new_sections && Object.keys(improvements.new_sections).length > 0) ||
+    (improvements.modifications && Object.keys(improvements.modifications).length > 0);
+  
+  if (!hasImprovements) {
+    console.log('✅ No new improvements needed - all issues already addressed or system working well');
+    return [];
+  }
+  
   // Validate improvements for safety
   if (!validateImprovements(improvements)) {
     console.error('❌ Improvements failed safety validation');
@@ -819,6 +966,145 @@ async function applyImprovements(improvements, discoveredAgents, requireApproval
   await logImprovement(improvements, updatedAgents);
   
   return updatedAgents;
+}
+
+/**
+ * Apply improvements to knowledge base instead of prompt
+ * NEW: Knowledge Base approach for scalability
+ */
+async function applyImprovementsToKnowledgeBase(improvements, discoveredAgents) {
+  console.log('📚 Applying improvements to Knowledge Base...');
+  
+  // Check if there are actually any improvements to apply
+  const hasImprovements = 
+    (improvements.new_sections && Object.keys(improvements.new_sections).length > 0) ||
+    (improvements.modifications && Object.keys(improvements.modifications).length > 0);
+  
+  if (!hasImprovements) {
+    console.log('✅ No new improvements needed - all issues already addressed or system working well');
+    return [];
+  }
+  
+  // Validate improvements for safety
+  if (!validateImprovements(improvements)) {
+    console.error('❌ Improvements failed safety validation');
+    throw new Error('Improvements contain potentially harmful content');
+  }
+  
+  const updatedAgents = [];
+  
+  // Apply improvements to each discovered agent
+  for (const agent of discoveredAgents) {
+    if (!agent.llm_id) {
+      console.log(`⚠️ Skipping ${agent.name} - no LLM configured`);
+      continue;
+    }
+    
+    try {
+      console.log(`🔄 Processing ${agent.name} for KB updates...`);
+      
+      // Ensure agent has a knowledge base
+      const kbId = await kbManager.ensureKnowledgeBase(agent.id, agent.name);
+      
+      // Prepare learnings to add
+      const learnings = [];
+      
+      // Add new sections as knowledge base documents
+      if (improvements.new_sections) {
+        for (const [section, content] of Object.entries(improvements.new_sections)) {
+          learnings.push({
+            section,
+            content,
+            metadata: {
+              agent_id: agent.id,
+              agent_name: agent.name,
+              issue_type: section.toLowerCase().replace(/_/g, ' '),
+              first_seen: new Date().toISOString(),
+              source: 'automated_learning',
+              keywords: extractKeywords(content)
+            }
+          });
+        }
+      }
+      
+      // Add modifications as enhanced/updated sections
+      if (improvements.modifications) {
+        for (const [section, modification] of Object.entries(improvements.modifications)) {
+          learnings.push({
+            section: `${section}_ENHANCED`,
+            content: modification,
+            metadata: {
+              agent_id: agent.id,
+              agent_name: agent.name,
+              issue_type: 'modification',
+              modification_date: new Date().toISOString(),
+              source: 'automated_enhancement',
+              keywords: extractKeywords(modification)
+            }
+          });
+        }
+      }
+      
+      // Add learnings to knowledge base in batch
+      console.log(`📝 Adding ${learnings.length} learnings to KB...`);
+      const results = await kbManager.addLearningsBatch(kbId, learnings);
+      
+      const successCount = results.filter(r => r.success).length;
+      console.log(`✅ Added ${successCount}/${learnings.length} learnings successfully`);
+      
+      // Link knowledge base to agent's LLM (if not already linked)
+      await kbManager.linkKnowledgeBaseToAgent(agent.id, agent.llm_id, kbId);
+      
+      // Get statistics for reporting
+      const stats = await kbManager.getStatistics(kbId);
+      
+      updatedAgents.push({
+        agent_id: agent.id,
+        agent_name: agent.name,
+        llm_id: agent.llm_id,
+        knowledge_base_id: kbId,
+        documents_added: successCount,
+        total_documents: stats?.total_documents || 0,
+        total_kb_size: stats?.total_size_chars || 0,
+        last_modified: new Date().toISOString(),
+        mode: 'knowledge_base'
+      });
+      
+    } catch (error) {
+      console.error(`❌ Failed to update KB for ${agent.name}:`, error.message);
+    }
+  }
+  
+  // Log the improvement
+  await logImprovement(improvements, updatedAgents);
+  
+  return updatedAgents;
+}
+
+/**
+ * Extract keywords from content for better semantic retrieval
+ */
+function extractKeywords(content) {
+  // Simple keyword extraction - looks for capitalized words and common patterns
+  const keywords = new Set();
+  
+  // Extract capitalized words (likely important terms)
+  const capitalizedWords = content.match(/\b[A-Z][a-z]+\b/g) || [];
+  capitalizedWords.forEach(word => keywords.add(word.toLowerCase()));
+  
+  // Extract common question patterns
+  const questions = content.match(/\b(what|how|when|where|why|which|who)\b/gi) || [];
+  questions.forEach(q => keywords.add(q.toLowerCase()));
+  
+  // Extract common customer concern words
+  const concernWords = ['discount', 'shipping', 'delivery', 'refund', 'cancel', 'price', 'cost', 'quality', 'fresh', 'frozen', 'allerg'];
+  concernWords.forEach(word => {
+    if (content.toLowerCase().includes(word)) {
+      keywords.add(word);
+    }
+  });
+  
+  return Array.from(keywords);
 }
 
 /**
@@ -970,11 +1256,13 @@ async function runImprovementLoop() {
       return { status: 'insufficient_data' };
     }
     
-    console.log(`✅ Analyzed ${analysis.total} phone calls (${analysis.total_calls_found} total calls found)`);
+    console.log(`✅ Analyzed ${analysis.total} phone calls from last 24 hours (${analysis.total_calls_found} total calls found)`);
     console.log(`   - Success rate: ${((analysis.successful.length / analysis.total) * 100).toFixed(1)}%`);
-    console.log(`   - Unhandled requests: ${analysis.unhandled_requests.length}`);
+    console.log(`   - Total unhandled requests: ${analysis.unhandled_requests.length}`);
+    console.log(`   - NEW issues (not previously addressed): ${analysis.new_issues_only.length}`);
     console.log(`   - Edge cases: ${analysis.edge_cases.length}`);
     console.log(`   - Agents discovered: ${analysis.discovered_agents.length}`);
+    console.log(`   - Previously addressed: ${analysis.previously_addressed.sections.length} sections, ${analysis.previously_addressed.fixes.length} fixes`);
     
     // Show agent-specific breakdown
     console.log('\n📊 Agent-specific breakdown:');
@@ -987,8 +1275,10 @@ async function runImprovementLoop() {
     }
     console.log('');
     
-    // Step 2: Generate improvements
-    console.log('🤖 Generating prompt improvements...');
+    // Step 2: Generate improvements focused on NEW issues only
+    console.log('\n🤖 Analyzing for NEW issues and improvements...');
+    console.log(`   Focusing on ${analysis.new_issues_only.length} NEW issues out of ${analysis.unhandled_requests.length} total requests`);
+    
     // Use the first discovered agent's LLM for generating improvements
     const firstAgent = analysis.discovered_agents.find(agent => agent.llm_id);
     if (!firstAgent) {
@@ -999,22 +1289,34 @@ async function runImprovementLoop() {
     const currentLLM = await retell.llm.retrieve(firstAgent.llm_id);
     const improvements = await generatePromptImprovements(analysis, currentLLM.general_prompt);
     
-    console.log('📝 Suggested improvements:');
-    console.log(`   - Priority fixes: ${improvements.priority_fixes?.join(', ')}`);
-    console.log(`   - Expected improvement: ${improvements.expected_improvement}\n`);
+    console.log('\n📝 Improvement Analysis Results:');
+    console.log(`   - New patterns identified: ${improvements.new_patterns_identified?.length || 0}`);
+    console.log(`   - New sections to add: ${Object.keys(improvements.new_sections || {}).length}`);
+    console.log(`   - Modifications suggested: ${Object.keys(improvements.modifications || {}).length}`);
+    console.log(`   - Priority fixes: ${improvements.priority_fixes?.join(', ') || 'None'}`);
+    console.log(`   - Expected improvement: ${improvements.expected_improvement}`);
     
     // Debug: Show full improvements
-    console.log('🔍 Full improvements object:');
+    console.log('\n🔍 Full improvements object:');
     console.log(JSON.stringify(improvements, null, 2));
     
-    // Step 3: Apply improvements
-    console.log('🚀 Applying improvements...');
-    const updatedAgents = await applyImprovements(improvements, analysis.discovered_agents);
+    // Step 3: Apply improvements (only if there are actual changes)
+    console.log('\n🚀 Applying improvements...');
+    console.log(`   Mode: ${CONFIG.USE_KNOWLEDGE_BASE ? 'Knowledge Base' : 'Direct Prompt'}`);
     
-    console.log('✅ All agent prompts updated successfully!');
-    for (const agent of updatedAgents) {
-      console.log(`   - ${agent.agent_name}: ${agent.llm_id}`);
-      console.log(`     Last modified: ${new Date(agent.last_modified).toISOString()}`);
+    const updatedAgents = CONFIG.USE_KNOWLEDGE_BASE 
+      ? await applyImprovementsToKnowledgeBase(improvements, analysis.discovered_agents)
+      : await applyImprovements(improvements, analysis.discovered_agents);
+    
+    if (updatedAgents.length > 0) {
+      console.log('✅ Agent prompts updated successfully!');
+      for (const agent of updatedAgents) {
+        console.log(`   - ${agent.agent_name}: ${agent.llm_id}`);
+        console.log(`     Last modified: ${new Date(agent.last_modified).toISOString()}`);
+      }
+    } else {
+      console.log('✅ No updates needed - all known issues already addressed!');
+      console.log('   System is learning incrementally and catching only new fringe cases');
     }
     console.log('');
     
@@ -1030,13 +1332,20 @@ async function runImprovementLoop() {
         calls_analyzed: analysis.total,
         total_calls_found: analysis.total_calls_found,
         success_rate: ((analysis.successful.length / analysis.total) * 100).toFixed(1),
-        improvements_made: true,
+        improvements_made: updatedAgents.length > 0,
         new_sections_added: improvements.new_sections || {},
         priority_fixes: improvements.priority_fixes || [],
         expected_improvement: improvements.expected_improvement || 'Unknown',
         next_analysis_time: new Date(Date.now() + (24 * 60 * 60 * 1000)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
-        status: 'Improvements applied successfully',
+        status: updatedAgents.length > 0 ? 'Improvements applied successfully' : 'No new issues - system performing well',
         agent_breakdown: analysis.by_agent,
+        // NEW: Add information about issue tracking
+        issue_tracking: {
+          total_unhandled_requests: analysis.unhandled_requests.length,
+          new_issues_found: analysis.new_issues_only.length,
+          previously_addressed: analysis.previously_addressed,
+          new_patterns: improvements.new_patterns_identified || []
+        },
         // Add performance comparison data
         performance_comparison: {
           before_improvement: beforeImprovement,
@@ -1047,8 +1356,14 @@ async function runImprovementLoop() {
         updated_agents: updatedAgents.map(agent => ({
           name: agent.agent_name,
           llm_id: agent.llm_id,
-          last_modified: new Date(agent.last_modified).toISOString()
-        }))
+          last_modified: new Date(agent.last_modified).toISOString(),
+          mode: agent.mode || 'prompt',
+          knowledge_base_id: agent.knowledge_base_id,
+          documents_added: agent.documents_added,
+          total_documents: agent.total_documents,
+          total_kb_size: agent.total_kb_size
+        })),
+        improvement_mode: CONFIG.USE_KNOWLEDGE_BASE ? 'knowledge_base' : 'direct_prompt'
       };
       
       await sendDailyImprovementSummary(summaryData);

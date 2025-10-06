@@ -447,7 +447,8 @@ export async function sendDailyImprovementSummary(summaryData) {
       next_analysis_time,
       status,
       performance_comparison,
-      agents_analyzed
+      agents_analyzed,
+      issue_tracking
     } = summaryData;
 
     const subject = `Daily Agent Improvement Summary - ${analysis_date}`;
@@ -491,6 +492,37 @@ export async function sendDailyImprovementSummary(summaryData) {
             <div class="metric-value">${agents_analyzed || 0}</div>
             <div class="metric-label">Agents Analyzed</div>
         </div>
+        
+        ${issue_tracking ? `
+        <div class="section-title">🎯 Incremental Learning Progress</div>
+        <div class="improvement" style="background: #e3f2fd; border-left: 4px solid #2196f3;">
+            <strong>📊 Issue Analysis (Last 24 Hours):</strong><br>
+            <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                <tr>
+                    <td style="padding: 8px; font-weight: bold;">Total Unhandled Requests Found:</td>
+                    <td style="padding: 8px; text-align: right;">${issue_tracking.total_unhandled_requests || 0}</td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td style="padding: 8px; font-weight: bold; color: #27ae60;">🆕 NEW Issues (Not Previously Addressed):</td>
+                    <td style="padding: 8px; text-align: right; font-size: 20px; font-weight: bold; color: #27ae60;">${issue_tracking.new_issues_found || 0}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;">✅ Previously Addressed Issues:</td>
+                    <td style="padding: 8px; text-align: right;">${(issue_tracking.total_unhandled_requests || 0) - (issue_tracking.new_issues_found || 0)}</td>
+                </tr>
+            </table>
+            
+            <strong>📚 Learning History:</strong><br>
+            • Sections already added: ${issue_tracking.previously_addressed?.sections?.length || 0}<br>
+            • Fixes already applied: ${issue_tracking.previously_addressed?.fixes?.length || 0}<br>
+            • Total improvements tracked: ${issue_tracking.previously_addressed?.total_improvements || 0}<br>
+            
+            ${issue_tracking.new_patterns && issue_tracking.new_patterns.length > 0 ? `
+            <br><strong>🔍 New Patterns Identified Today:</strong><br>
+            ${issue_tracking.new_patterns.map(pattern => `• ${pattern}`).join('<br>')}
+            ` : '<br><em>No new patterns identified - system handling all known scenarios</em>'}
+        </div>
+        ` : ''}
         
         ${performance_comparison ? `
         <div class="section-title">📈 Performance Improvement Tracking</div>

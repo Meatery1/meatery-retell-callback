@@ -7,8 +7,14 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "improve": "node src/prompt-improvement-loop.js",
+    "improve:kb": "USE_KNOWLEDGE_BASE=true node src/prompt-improvement-loop.js",
     "approve": "node src/approve-improvements.js",
-    "scheduler": "node src/improvement-scheduler.js"
+    "scheduler": "node src/improvement-scheduler.js",
+    "kb:migrate": "node src/scripts/migrate-to-knowledge-base.js",
+    "kb:core-prompts": "node src/scripts/create-core-prompts.js",
+    "kb:core-prompts:apply": "node src/scripts/create-core-prompts.js --apply",
+    "kb:test": "node src/scripts/test-kb-mode.js",
+    "kb:compare": "node src/scripts/test-kb-mode.js"
   },
   "dependencies": {
     "@abhaybabbar/retellai-mcp-server": "^1.0.2",
