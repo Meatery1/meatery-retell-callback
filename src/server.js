@@ -1289,6 +1289,207 @@ app.post("/tools/check-discount-eligibility", async (req, res) => {
   }
 });
 
+// --- Send Checkout Link endpoint (no discount) ---
+app.post("/tools/send-checkout-link", async (req, res) => {
+  try {
+    console.log('🔗 Send Checkout Link tool called:', {
+      body: req.body,
+      args: req.body?.args,
+      call: req.body?.call
+    });
+
+    // Retell sends params in body.args
+    const params = req.body?.args || req.body || {};
+    
+    // Get the call context from Retell
+    const callData = req.body?.call || {};
+    
+    // Extract parameters
+    const { 
+      customer_email,
+      customer_phone,
+      checkout_url,
+      customer_name = 'Customer',
+      discount_percentage = '0'
+    } = params;
+
+    console.log('🔗 Parameters:', {
+      customer_email,
+      customer_phone,
+      checkout_url,
+      customer_name,
+      discount_percentage
+    });
+
+    // Validate required fields
+    if (!customer_email || !customer_phone || !checkout_url) {
+      console.error('❌ Missing required fields');
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: customer_email, customer_phone, checkout_url',
+        speak: "I'm missing some information needed to send your checkout link. Let me transfer you to someone who can help."
+      });
+    }
+
+    // Format phone number
+    let formattedPhone = String(customer_phone || '').replace(/\D/g, '');
+    if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
+      formattedPhone = '1' + formattedPhone;
+    }
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = '+' + formattedPhone;
+    }
+
+    // Create SMS message
+    const discountText = discount_percentage && discount_percentage !== '0' 
+      ? ` You've already got ${discount_percentage}% off!` 
+      : '';
+    
+    const message = `Hey ${customer_name}! Here's your checkout link: ${checkout_url}${discountText}`;
+
+    // Send SMS via Twilio
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || '+16193913495';
+
+    if (!twilioAccountSid || !twilioAuthToken) {
+      console.error('❌ Twilio credentials not configured');
+      return res.status(500).json({
+        success: false,
+        error: 'SMS service not configured',
+        speak: "I'm having trouble sending that message right now. Let me have someone reach out to you directly."
+      });
+    }
+
+    // Send SMS
+    console.log('📱 Sending SMS to:', formattedPhone);
+    const twilioResponse = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          To: formattedPhone,
+          From: twilioPhoneNumber,
+          Body: message
+        })
+      }
+    );
+
+    if (!twilioResponse.ok) {
+      const error = await twilioResponse.text();
+      console.error('❌ Twilio error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send SMS',
+        speak: "I'm having trouble sending that text message. Let me have someone from our team reach out to you."
+      });
+    }
+
+    const twilioResult = await twilioResponse.json();
+    console.log('✅ SMS sent successfully:', twilioResult.sid);
+
+    // Track in Klaviyo as a metric
+    try {
+      await trackKlaviyoCheckoutLinkSent(customer_email, {
+        checkout_url,
+        customer_phone: formattedPhone,
+        customer_name,
+        discount_percentage,
+        sms_sid: twilioResult.sid
+      });
+    } catch (klaviyoError) {
+      console.error('❌ Error tracking in Klaviyo (non-fatal):', klaviyoError);
+      // Continue even if Klaviyo tracking fails
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Checkout link sent successfully',
+      sms_sid: twilioResult.sid,
+      speak: `Perfect! I've sent your checkout link to ${formattedPhone}. You should receive it in just a moment.`
+    });
+
+  } catch (error) {
+    console.error('❌ Error sending checkout link:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to send checkout link',
+      speak: "I apologize, but I'm unable to send that link right now. Let me have someone from our team follow up with you."
+    });
+  }
+});
+
+// Track the checkout link sent event in Klaviyo
+async function trackKlaviyoCheckoutLinkSent(email, properties) {
+  const klaviyoApiKey = process.env.KLAVIYO_PRIVATE_API_KEY;
+  
+  if (!klaviyoApiKey) {
+    console.warn('⚠️ Klaviyo API key not configured');
+    return;
+  }
+
+  const event = {
+    data: {
+      type: 'event',
+      attributes: {
+        profile: {
+          data: {
+            type: 'profile',
+            attributes: {
+              email: email
+            }
+          }
+        },
+        metric: {
+          data: {
+            type: 'metric',
+            attributes: {
+              name: 'Abandoned Checkout Link Sent'
+            }
+          }
+        },
+        properties: {
+          checkout_url: properties.checkout_url,
+          customer_phone: properties.customer_phone,
+          customer_name: properties.customer_name,
+          discount_percentage: properties.discount_percentage,
+          sms_sid: properties.sms_sid,
+          sent_at: new Date().toISOString(),
+          source: 'retell_ai_agent'
+        },
+        time: new Date().toISOString()
+      }
+    }
+  };
+
+  try {
+    const response = await fetch('https://a.klaviyo.com/api/events/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Klaviyo-API-Key ${klaviyoApiKey}`,
+        'Content-Type': 'application/json',
+        'revision': '2024-10-15'
+      },
+      body: JSON.stringify(event)
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ Klaviyo API error:', error);
+      throw new Error('Failed to track event in Klaviyo');
+    }
+
+    console.log('✅ Tracked "Abandoned Checkout Link Sent" event in Klaviyo');
+  } catch (error) {
+    console.error('❌ Error tracking Klaviyo event:', error);
+    throw error;
+  }
+}
+
 // --- Voicemail Follow-up endpoint for Retell custom tools ---
 app.post("/tools/send-voicemail-followup", async (req, res) => {
   try {
