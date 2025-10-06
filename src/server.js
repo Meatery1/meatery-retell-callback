@@ -1332,13 +1332,46 @@ app.post("/tools/send-checkout-link", async (req, res) => {
       });
     }
 
+    // If checkout_url is a template variable or missing, fetch it from Shopify
+    let finalCheckoutUrl = checkout_url;
     if (!checkout_url || checkout_url === '{{checkout_url}}') {
-      console.error('❌ Invalid checkout URL');
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid checkout URL provided',
-        speak: "I'm having trouble accessing your checkout information. Let me have someone from our team reach out to you directly."
-      });
+      console.log('⚠️ Checkout URL not provided, attempting to fetch from Shopify...');
+      
+      // Try to get checkout_id from dynamic variables
+      const checkoutId = callData?.retell_llm_dynamic_variables?.checkout_id;
+      
+      if (checkoutId) {
+        try {
+          const { fetchAbandonedCheckoutById } = await import('./shopify-graphql-queries.js');
+          const checkout = await fetchAbandonedCheckoutById(checkoutId);
+          
+          if (checkout?.abandonedCheckoutUrl) {
+            finalCheckoutUrl = checkout.abandonedCheckoutUrl;
+            console.log(`✅ Fetched checkout URL from Shopify: ${finalCheckoutUrl}`);
+          } else {
+            console.error('❌ Could not retrieve checkout URL from Shopify');
+            return res.status(400).json({
+              success: false,
+              error: 'Could not retrieve checkout URL',
+              speak: "I'm having trouble accessing your checkout information. Let me have someone from our team reach out to you directly with your checkout link."
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error fetching checkout from Shopify:', error);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch checkout information',
+            speak: "I'm having trouble accessing your checkout information. Let me have someone from our team reach out to you directly."
+          });
+        }
+      } else {
+        console.error('❌ No checkout_id available in dynamic variables');
+        return res.status(400).json({
+          success: false,
+          error: 'Missing checkout information',
+          speak: "I'm having trouble accessing your checkout information. Let me have someone from our team reach out to you directly."
+        });
+      }
     }
 
     // Format phone number
@@ -1358,6 +1391,7 @@ app.post("/tools/send-checkout-link", async (req, res) => {
     const channelTarget = channel === 'sms' ? formattedPhone : customer_email;
 
     console.log(`📱 Sending checkout link via ${channel} to ${channelTarget}`);
+    console.log(`🔗 Using checkout URL: ${finalCheckoutUrl}`);
 
     // Send Klaviyo event to trigger flow
     try {
@@ -1365,7 +1399,7 @@ app.post("/tools/send-checkout-link", async (req, res) => {
         customerEmail: customer_email,
         customerPhone: formattedPhone,
         customerName: customer_name,
-        checkoutUrl: checkout_url,
+        checkoutUrl: finalCheckoutUrl,
         discountPercentage: discount_percentage,
         channel: channel
       });

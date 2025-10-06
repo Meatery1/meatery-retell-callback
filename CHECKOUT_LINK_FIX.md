@@ -1,12 +1,28 @@
 # Checkout Link Tool Fix - Summary
 
-## Problem
+## Problems Fixed
+
+### Problem 1: Twilio Not Configured
 The `send_checkout_link` tool was attempting to send SMS messages directly via Twilio, which wasn't configured. This resulted in the error:
 ```
 ❌ Twilio credentials not configured
 ```
 
-## Solution
+### Problem 2: Missing checkout_url Dynamic Variable ⚠️
+The agent prompt references `{{checkout_url}}` but this variable was **not being provided** when calls were initiated. The agent was passing the literal string `'{{checkout_url}}'` to the tool, causing:
+```
+❌ Invalid checkout URL
+```
+
+Dynamic variables provided:
+- ✅ `checkout_id` (available)
+- ❌ `checkout_url` (missing!)
+
+**Root Cause:** The abandoned checkout call initiation wasn't including the actual checkout URL, only the Shopify checkout ID.
+
+## Solutions
+
+### Solution 1: Use Klaviyo Events Instead of Twilio
 **Changed from:** Direct Twilio SMS → **To:** Klaviyo Event triggering a Flow
 
 The tool now follows the same pattern as the `send-discount` endpoint:
@@ -14,15 +30,25 @@ The tool now follows the same pattern as the `send-discount` endpoint:
 2. A Klaviyo Flow (to be created) listens for this event
 3. The Flow sends the SMS/Email to the customer
 
+### Solution 2: Auto-Fetch Checkout URL from Shopify ✨
+When `{{checkout_url}}` is not provided (or is a template string), the tool now:
+1. Extracts `checkout_id` from the call's dynamic variables
+2. Fetches the actual checkout URL from Shopify using `fetchAbandonedCheckoutById()`
+3. Uses the real URL for the Klaviyo event
+
+**This means:** The agent doesn't need the `checkout_url` variable anymore - it will automatically fetch it!
+
 ## Changes Made
 
 ### 1. Updated `src/server.js`
-- **Line 1293-1404**: Rewrote `/tools/send-checkout-link` endpoint
+- **Line 1293-1440**: Rewrote `/tools/send-checkout-link` endpoint
   - Removed Twilio SMS sending logic
   - Added Klaviyo event integration
-  - Improved validation (now accepts `{{checkout_url}}` placeholder and rejects it)
+  - **Added auto-fetch from Shopify** when checkout_url is missing/invalid
+  - Improved validation and error handling
   - Better error messages for the agent
 - **Line 18**: Added import for `sendCheckoutLinkViaKlaviyoEvent`
+- **Line 1345**: Added dynamic import for `fetchAbandonedCheckoutById`
 - **Removed**: Old `trackKlaviyoCheckoutLinkSent` function (no longer needed)
 
 ### 2. Created `sendCheckoutLinkViaKlaviyoEvent` in `src/klaviyo-events-service.js`
@@ -93,8 +119,11 @@ The tool now follows the same pattern as the `send-discount` endpoint:
 ### Expected Logs:
 ```
 🔗 Send Checkout Link tool called
-🔗 Parameters: { customer_email, customer_phone, checkout_url, ... }
+🔗 Parameters: { customer_email, customer_phone, checkout_url: '{{checkout_url}}', ... }
+⚠️ Checkout URL not provided, attempting to fetch from Shopify...
+✅ Fetched checkout URL from Shopify: https://themeatery.com/checkouts/...
 📱 Sending checkout link via sms to +16197524353
+🔗 Using checkout URL: https://themeatery.com/checkouts/...
 📤 Sending checkout link event to Klaviyo for sms
 ✅ Klaviyo checkout link event sent for sms to +16197524353
 ✅ Klaviyo checkout link event sent successfully
